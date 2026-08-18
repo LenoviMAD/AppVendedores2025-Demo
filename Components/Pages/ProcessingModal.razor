@@ -1,0 +1,21 @@
+﻿@code {
+    [Parameter] public bool IsVisible { get; set; }  // Controla si el modal es visible o no
+    [Parameter] public int Progress { get; set; }    // Controla el progreso de la barra (de 0 a 100)
+    [Parameter] public EventCallback OnClose { get; set; }  // Evento para cerrar el modal
+
+    private void CloseModal()
+    {
+        OnClose.InvokeAsync(null); // Llama al evento OnClose para indicar que el modal debe cerrarse
+    }
+}
+
+@if (IsVisible)
+{
+    <div class="processing-modal-overlay">
+        <div class="processing-modal-content">
+            <h3>Procesando Pago...</h3>
+            <progress value="@Progress" max="100" class="progress-bar"></progress>
+            <p>Por favor, espera mientras procesamos tu pago...</p>
+        </div>
+    </div>
+}

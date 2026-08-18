@@ -1,0 +1,69 @@
+﻿@page "/mensajes"
+@using AppVendedores2025.Services
+@using EntidadesAppVendedores
+@using Microsoft.JSInterop
+@using Newtonsoft.Json
+
+@inject IJSRuntime JS
+
+<h1>Mensajes</h1>
+
+@foreach (var mensaje in lsMSG)
+{
+    
+    <div class="@ClassRenglon(mensaje.MensajeID)">
+        <h2>Asunto: @mensaje.Subject</h2>
+        <p>Fecha: @mensaje.Fecha</p>
+ 
+
+        <button type="button" class="btn btn-primary" @onclick="@(()=> VerMensaje(mensaje))">Ver mensaje</button>
+    </div>
+}
+@code {
+
+    List<int> lsMSGleidos = new List<int>();
+
+    public string ClassRenglon(int mensaje )
+    {
+        string c = "";
+
+
+        var leido = lsMSGleidos.Contains(mensaje);
+
+        if (!leido )
+        {
+            c = "mensajeavdsinleer";
+        }
+
+        return c;
+    }
+
+    List<MensajeAVendedorItem> lsMSG = new List<MensajeAVendedorItem>();
+    protected override async Task OnInitializedAsync()
+    {
+        LocalStorageAccessor LocalStorage = new LocalStorageAccessor(JS);
+        lsMSG = JsonConvert.DeserializeObject<List<MensajeAVendedorItem>>(await LocalStorage.GetValueAsync<string>("Mensajes") ?? "[]");
+        lsMSG = lsMSG.OrderBy(c => c.Fecha).ToList();
+        lsMSGleidos = JsonConvert.DeserializeObject<List<int>>(await LocalStorage.GetValueAsync<string>("MensajesLeidos") ?? "[]");
+
+        StateHasChanged();
+    }
+
+    public  async Task VerMensaje(MensajeAVendedorItem msg)
+
+    {
+        var res = await App.Current.MainPage.DisplayAlert(msg.Subject, msg.Mensage, "SI", "NO");
+        if (res)
+        {
+
+            LocalStorageAccessor LocalStorage = new LocalStorageAccessor(JS);
+             lsMSGleidos = JsonConvert.DeserializeObject<List<int>>(await LocalStorage.GetValueAsync<string>("MensajesLeidos") ?? "[]");
+
+            lsMSGleidos.Add(msg.MensajeID);
+            await LocalStorage.SetValueAsync("MensajesLeidos", System.Text.Json.JsonSerializer.Serialize(lsMSGleidos));
+
+
+        }
+
+    }
+}

@@ -1,0 +1,126 @@
+﻿@using System.Globalization
+@using AppVendedores2025.Services
+@using AppVendedores2025.Localization
+@using System.Diagnostics;
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<div class="dropdown" style="
+     text-align-last: right;">
+    <button class="btn dropdown-toggle d-inline-flex align-items-center"
+            type="button"
+            id="langDropdown"
+            data-bs-toggle="dropdown"
+            aria-expanded="false"
+            data-bs-auto-close="true">
+        <img src="@Current.Flag" alt="" width="18" height="18" class="rounded-circle me-2" />
+     @*    <span style="font-weight:bold;" class="me-1">@Current.Label</span>
+        <small class="text-secondary">(@Current.Code)</small> *@
+    </button>
+
+    <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end" aria-labelledby="langDropdown">
+        @foreach (var item in Items)
+        {
+            <li>
+                <button type="button"
+                        class="dropdown-item d-flex align-items-center"
+                        @onclick="() => OnSelectAsync(item)">
+                    <img src="@item.Flag" alt="" width="18" height="18" class="rounded-circle me-2" />
+                    <span>@item.Label</span>
+                </button>
+            </li>
+        }
+    </ul>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Error))
+{
+    <div class="alert alert-danger py-1 px-2 mt-2 mb-0 small" role="alert">@Error</div>
+}
+
+@code {
+    private string? Error;
+
+    private static readonly List<LangItem> Items = new()
+    {
+        new("es-AR", "Español", "img/flags/es.png"),
+        new("en", "English" , "img/flags/en.png"),
+        new("pt-BR", "Português", "img/flags/ptbr.png"),
+        new("zh-CN", "中文", "img/flags/zhcn.png"),
+    };
+
+    private LangItem Current =>
+        FindByCode(CultureInfo.CurrentUICulture.Name)
+        ?? FindByCode(CultureInfo.CurrentUICulture.TwoLetterISOLanguageName)
+        ?? Items.First();
+
+    private static LangItem? FindByCode(string code)
+        => Items.FirstOrDefault(i => string.Equals(i.Code, code, StringComparison.OrdinalIgnoreCase));
+
+    private async Task OnSelectAsync(LangItem item)
+    {
+        Error = null;
+        try
+        {
+            // 1) Setear cultura (persistís en Preferences adentro de tu LanguageService)
+            if (!LanguageService.TrySetCulture(item.Code, out var err))
+            {
+                Error = err ?? "No se pudo cambiar el idioma.";
+                return;
+            }
+
+            // 2) Notificar a bindings reactivos (si los usás)
+            LocalizationResourceManager.Instance.NotifyCultureChanged();
+
+
+         try
+{
+    
+   var ci = CultureInfo.CurrentUICulture;
+    Debug.WriteLine($"[I18N] CurrentUICulture = {ci.Name}");
+
+    var rm = AppVendedores2025.Resources.Strings.AppResources.ResourceManager;
+    var fromPt = rm.GetString("Titulo", new CultureInfo("pt-BR"));
+    var fromCurrent = rm.GetString("Titulo", ci);
+
+    Debug.WriteLine($"[I18N] Titulo (pt-BR explicit) = {fromPt ?? "(null)"}");
+    Debug.WriteLine($"[I18N] Titulo (current) = {fromCurrent ?? "(null)"}");
+}
+catch (Exception ex)
+{
+    Debug.WriteLine("[I18N] Test error: " + ex);
+}
+
+
+
+            // 3) Forzar recarga inmediata de TODO:
+            await ForceFullReloadAsync();
+        }
+        catch (Exception ex)
+        {
+            Error = $"Error: {ex.Message}";
+        }
+    }
+
+    private async Task ForceFullReloadAsync()
+    {
+        try
+        {
+            // Recarga la ruta actual (preserva URL) — en MAUI Blazor suele alcanzar
+            Nav.NavigateTo(Nav.Uri, forceLoad: true);
+        }
+        catch (Exception navEx)
+        {
+            // Fallback: forzar reload del documento vía JS
+            try { await JS.InvokeVoidAsync("eval", "location.reload()"); }
+            catch (Exception jsEx)
+            {
+                // Último recurso: refresco local (no recarga todo, pero evita quedarte “quieto”)
+                Error ??= $"No se pudo recargar automáticamente. {navEx.Message} / {jsEx.Message}";
+                StateHasChanged();
+            }
+        }
+    }
+
+    private record LangItem(string Code, string Label, string Flag);
+}

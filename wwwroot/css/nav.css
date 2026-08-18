@@ -1,0 +1,72 @@
+
+/* ── ESTILOS SIN USO ────────────────────────────────────────────────────────
+   Las clases de este archivo pertenecen a la navegación legacy (nav clásico).
+   En el diseño actual la app usa headers propios por página (.clientes-header,
+   .vph-wrapper, .dash-header, etc.) y NO utiliza .headnav, #logo, .searchform
+   ni .searchInput en ningún componente .razor.
+   Se comentan para preservarlos sin eliminarlos.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* SIN USO — barra de navegación legacy
+.headnav {
+    box-shadow: 0 0 10px rgba(0,0,0,0.4);
+    z-index: 2;
+    position: fixed;
+    width: 100%;
+    background: white;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    font-size: 100%;
+    font-weight: normal;
+    vertical-align: baseline;
+    background: transparent;
+}
+*/
+
+/* SIN USO — logo de la barra legacy
+#logo {
+    width: 11%;
+    margin: 0;
+    padding: 1.1vw 0;
+    display: block;
+    background: url(../img/logo.gif) center center / contain no-repeat;
+    width: 100%;
+}
+*/
+
+/* SIN USO — formulario de búsqueda legacy
+.searchform {
+    border: 1px solid #828282;
+    overflow: hidden;
+    border-radius: 4vw;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    font-size: 100%;
+    font-weight: normal;
+    vertical-align: baseline;
+    background: transparent;
+    display: inline-block;
+    vertical-align: middle;
+    float: left;
+}
+*/
+
+/* SIN USO — input de búsqueda legacy (el id="searchInput" en VistaProductosHeader
+   es un ID en el HTML, no usa esta clase CSS)
+.searchInput {
+    height: 6.5vw;
+    margin-left: 5%;
+    font-size: .8em;
+    width: 80%;
+    text-align: left;
+    float: left;
+    display: inline-block;
+    vertical-align: middle;
+    outline: none;
+    border: 0;
+    margin: 0;
+    padding: 0;
+}
+*/

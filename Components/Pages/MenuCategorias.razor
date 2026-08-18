@@ -1,0 +1,332 @@
+﻿@using System.Globalization
+@using System.Text
+@using AppVendedores2025
+@inject IJSRuntime JS
+
+<div class="bg-white rounded-4 shadow-sm p-3 cat-shell">
+
+    @if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <div class="alert alert-warning py-2 mb-3" role="alert">
+            <i class="bi bi-exclamation-triangle me-1"></i> @_error
+        </div>
+    }
+
+    @if (Loading)
+    {
+        <div class="cat-carousel-grid">
+            @{
+                var placeholders = Enumerable.Range(0, Math.Max(2, Math.Min(MaxItems, 4))).ToList();
+            }
+
+            @foreach (var _ in placeholders)
+            {
+                <div class="cat-col">
+                    <div class="card border-0 rounded-4 cat-hero" style="@GetFeaturedCardStyleCarousel()">
+                        <div class="card-body p-0 cat-img-body">
+                            <div class="placeholder-glow w-100 h-100 d-flex align-items-center justify-content-center">
+                                <div class="rounded-4 bg-light placeholder" style="width:100%;height:100%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else if (Categorias is null || Categorias.Count == 0)
+    {
+        <div class="text-muted small">
+            <i class="bi bi-info-circle me-1"></i>
+            No hay categorías para mostrar.
+        </div>
+    }
+    else
+    {
+        var catsAll = Categorias.Take(MaxItems).ToList();
+        var slides = Chunk2(catsAll);
+
+        <div id="@_carouselId"
+             class="carousel carousel-fade cat-carousel"
+             data-bs-touch="true"
+             data-bs-interval="@AutoSlideMs">
+
+            @if (slides.Count > 1)
+            {
+                <div class="carousel-indicators" style="margin-bottom:-6px;">
+                    @for (int i = 0; i < slides.Count; i++)
+                    {
+                        <button type="button"
+                                data-bs-target="#@_carouselId"
+                                data-bs-slide-to="@i"
+                                class="@(i == 0 ? "active" : null)"
+                                aria-current="@(i == 0 ? "true" : "false")"
+                                aria-label="Slide @(i + 1)">
+                        </button>
+                    }
+                </div>
+            }
+
+            <div class="carousel-inner">
+                @for (int i = 0; i < slides.Count; i++)
+                {
+                    var slide = slides[i];
+                    var items = slide.ToList();
+
+                    if (items.Count == 1)
+                    {
+                        items.Add(null!);
+                    }
+
+                    <div class="carousel-item @(i == 0 ? "active" : null)">
+                        <div class="cat-carousel-grid">
+                            @foreach (var cat in items)
+                            {
+                                @if (cat is null)
+                                {
+                                    <div class="cat-col">
+                                        <div class="cat-placeholder" aria-hidden="true"></div>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="cat-col">
+                                        <button type="button"
+                                                class="p-0 border-0 bg-transparent w-100 d-block"
+                                                aria-label="Abrir categoría @cat.categoria"
+                                                @onclick="() => HandleClickAsync(cat)">
+
+                                            <div class="card border-0 rounded-4 cat-hero"
+                                                 style="@GetFeaturedCardStyleCarousel()">
+
+                                                <div class="card-body p-0 d-flex flex-column cat-body">
+                                                    <div class="cat-img-wrap">
+                                                        @RenderCategoriaImagenFull(cat)
+                                                    </div>
+
+                                                    <div class="cat-title px-2 py-1">
+                                                        @cat.categoria
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </button>
+                                    </div>
+                                }
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+
+            @if (slides.Count > 1)
+            {
+                <button class="carousel-control-prev"
+                        type="button"
+                        data-bs-target="#@_carouselId"
+                        data-bs-slide="prev"
+                        aria-label="Anterior">
+                    <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                </button>
+
+                <button class="carousel-control-next"
+                        type="button"
+                        data-bs-target="#@_carouselId"
+                        data-bs-slide="next"
+                        aria-label="Siguiente">
+                    <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                </button>
+            }
+        </div>
+    }
+</div>
+
+
+
+@code {
+    [Parameter] public List<CategoriaItem>? Categorias { get; set; }
+    [Parameter] public EventCallback<int> OnSeleccionarCategoria { get; set; }
+
+    [Parameter] public int MaxItems { get; set; } = 8;
+    [Parameter] public bool Loading { get; set; } = false;
+
+    [Parameter] public int IconPx { get; set; } = 86;
+    [Parameter] public int CardMaxWidthPx { get; set; } = 190;
+    [Parameter] public int AutoSlideMs { get; set; } = 2600;
+
+    private string? _error;
+    private readonly string _carouselId = "catCarousel_" + Guid.NewGuid().ToString("N");
+
+    private bool _needsCarouselInit = true;
+    private int _lastRenderHash = -1;
+
+    protected override void OnParametersSet()
+    {
+        try
+        {
+            _error = null;
+
+            var count = Categorias?.Count ?? 0;
+            var hash = HashCode.Combine(count, Loading, MaxItems, IconPx, CardMaxWidthPx, AutoSlideMs);
+
+            if (hash != _lastRenderHash)
+            {
+                _lastRenderHash = hash;
+                _needsCarouselInit = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = "Error en OnParametersSet: " + ex.Message;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        try
+        {
+            if (!_needsCarouselInit)
+                return;
+
+            if (Loading || Categorias is null || Categorias.Count == 0)
+                return;
+
+            _needsCarouselInit = false;
+
+            bool exists;
+            try
+            {
+                exists = await JS.InvokeAsync<bool>("catCarouselInit.exists");
+            }
+            catch
+            {
+                exists = false;
+            }
+
+            if (!exists)
+            {
+                _error = "No se cargó Bootstrap Carousel o catCarouselInit.js.";
+                await InvokeAsync(StateHasChanged);
+                return;
+            }
+
+            await Task.Delay(350);
+            await JS.InvokeVoidAsync("catCarouselInit.restart", _carouselId, AutoSlideMs);
+        }
+        catch (Exception ex)
+        {
+            _error = "No se pudo inicializar el carrusel: " + ex.Message;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    static string Normalizar(string? s)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(s))
+                return "";
+
+            s = s.Trim().ToLowerInvariant();
+
+            var formD = s.Normalize(NormalizationForm.FormD);
+            var sb = new StringBuilder();
+
+            foreach (var ch in formD)
+            {
+                if (CharUnicodeInfo.GetUnicodeCategory(ch) != UnicodeCategory.NonSpacingMark)
+                    sb.Append(ch);
+            }
+
+            return sb.ToString().Normalize(NormalizationForm.FormC);
+        }
+        catch
+        {
+            return "";
+        }
+    }
+
+    private string GetFeaturedCardStyleCarousel()
+    {
+        try
+        {
+            var h = Math.Max(IconPx + 54, 150);
+            return $"width:100%; height:{h}px;";
+        }
+        catch
+        {
+            return "width:100%; height:150px;";
+        }
+    }
+
+    private RenderFragment RenderCategoriaImagenFull(CategoriaItem cat) => builder =>
+    {
+        try
+        {
+            var pathPorDefecto = $"/img/menuCategoria/{Normalizar(cat.categoria)}.png";
+
+            builder.OpenElement(0, "img");
+            builder.AddAttribute(1, "src", pathPorDefecto);
+            builder.AddAttribute(2, "alt", cat.categoria);
+            builder.AddAttribute(3, "class", "cat-img-full");
+            builder.AddAttribute(4, "loading", "lazy");
+            builder.AddAttribute(5, "onerror", "this.onerror=null;this.src='/img/categorias/placeholder.png';");
+            builder.CloseElement();
+        }
+        catch
+        {
+            builder.OpenElement(10, "div");
+            builder.AddAttribute(11, "class", "w-100 h-100 d-flex align-items-center justify-content-center bg-light");
+            builder.OpenElement(12, "i");
+            builder.AddAttribute(13, "class", "bi bi-grid fs-2 text-secondary");
+            builder.CloseElement();
+            builder.CloseElement();
+        }
+    };
+
+    private async Task HandleClickAsync(CategoriaItem cat)
+    {
+        try
+        {
+            _error = null;
+
+            if (cat is null || cat.categoriaID <= 0)
+            {
+                _error = "Categoría inválida.";
+                return;
+            }
+
+            if (OnSeleccionarCategoria.HasDelegate)
+                await OnSeleccionarCategoria.InvokeAsync(cat.categoriaID);
+        }
+        catch (Exception ex)
+        {
+            _error = "No se pudo abrir la categoría: " + ex.Message;
+        }
+    }
+
+    private List<List<CategoriaItem>> Chunk2(List<CategoriaItem> items)
+    {
+        var result = new List<List<CategoriaItem>>();
+
+        try
+        {
+            if (items is null || items.Count == 0)
+                return result;
+
+            for (int i = 0; i < items.Count; i += 2)
+            {
+                var slide = new List<CategoriaItem> { items[i] };
+
+                if (i + 1 < items.Count)
+                    slide.Add(items[i + 1]);
+
+                result.Add(slide);
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = "Error al agrupar categorías: " + ex.Message;
+        }
+
+        return result;
+    }
+}

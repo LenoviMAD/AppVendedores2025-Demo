@@ -1,0 +1,173 @@
+@page "/SolicitudAlta"
+@inject IJSRuntime JS
+
+@inject ClienteAltaService ClienteAltaService
+
+
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@10/dist/sweetalert2.min.css">
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@10/dist/sweetalert2.all.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@700&display=swap" rel="stylesheet">
+
+
+<div id="fondoSolicitud">
+    <div id="logocamionSolicitud"></div>
+
+<h3 style="text-align: center; color: black; font-family: 'Roboto', sans-serif; font-size: 28px; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2); margin-top: 60px;">
+    Alta de Usuario
+</h3>
+    <div class="resaltadoDiv" style="color:white !important">
+    @if (!solicitudEnviada)
+    {   
+    
+
+        <EditForm Model="@solicitud" OnValidSubmit="@EnviarSolicitudUno">
+              <DataAnnotationsValidator /> 
+
+        <div class="CardNuevaForm" style="color:black; width: 100%;">
+                    <table style="width: 100%; color:white !important" class="styled-table">
+                <thead>
+                    <tr style="margin-bottom:7px">
+                        <th>Formulario de Alta</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>
+                            <input style="width: 100%; border-color: #404040; border-width: 2px; border-style: solid; border-radius: 10px;"
+                                   placeholder="Ingrese su nombre y apellido.." @bind="@solicitud.NombreApellido" />
+                                    <ValidationMessage For="@(() => solicitud.NombreApellido)" style="color:white ; background-color:red" />
+                            <div style="display: block; margin-top: 3px;">
+                                <input style="width: 100%; border-color: #404040; border-width: 2px; border-style: solid; border-radius: 10px;"
+                                       placeholder="Ingrese su dirección..." @bind="@solicitud.Direccion" />
+                                    <ValidationMessage For="@(() => solicitud.Direccion)" style="color:white ; background-color:red" />
+                            </div>
+                            <div style="display: block; margin-top: 3px;">
+                                <input style="width: 100%; border-color: #404040; border-width: 2px; border-style: solid; border-radius: 10px;"
+                                       placeholder="Ingrese el teléfono..." @bind="@solicitud.Telefono" />
+                                    <ValidationMessage For="@(() => solicitud.Telefono)" style="color:white ; background-color:red" />
+                            </div>
+                            <div style="display: block; margin-top: 3px;">
+                                <input style="width: 100%; border-color: #404040; border-width: 2px; border-style: solid; border-radius: 10px;"
+                                       placeholder="Ingrese su email..." @bind="@solicitud.Email" />
+                                     <ValidationMessage For="@(() => solicitud.Email)" style="color:white ; background-color:red" />
+                            </div>
+                        </td>
+                    </tr>
+                    <tr style="color: black; background-color: inherit; text-align: center;">
+                        <td>
+                                <button style="background-color:#003366" type="submit" class="btn btn-primary btn-sm w-80">
+                                Enviar solicitud
+                            </button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div>
+            <a  style="background-color:#003366"
+                href="/" class="boton_menu2">
+                <img src="/img/girar-a-la-izquierda.png" />
+            </a>
+        </div>
+    </EditForm>
+    
+    }
+    else
+    {
+        <div class="alert alert-success">
+            ¡Gracias por tu solicitud a AppVendedores2025 Demo! Nos estaremos comunicando a la brevedad.
+        </div>
+        <div>
+            <a href="/" class="boton_menu2">
+                <img src="/img/girar-a-la-izquierda.png" />
+            </a>
+        </div>
+    }
+    </div>
+</div>
+
+
+
+@code {
+
+    private SolicitudAltaModel solicitud = new SolicitudAltaModel();
+    private bool solicitudEnviada = false;
+
+    private async Task EnviarSolicitudUno()
+    {
+        var solicitudIng = solicitud;
+        await EnviarSolicitud(solicitudIng.NombreApellido, solicitudIng.Direccion, solicitudIng.Telefono, solicitudIng.Email);
+
+    }
+
+    public async Task EnviarSolicitud(string nomYApell, string dire, string tel, string email)
+    {
+
+        var AltaCliente = new AltaDeClientesItem();
+
+
+        AltaCliente.NombreYApellido = nomYApell;
+        AltaCliente.Direccion = dire;
+        AltaCliente.Telefono = tel;
+        AltaCliente.Email = email;
+        AltaCliente.FechaAlta = DateTime.Now;
+        AltaCliente.Estatus = 0;
+
+        
+        await ClienteAltaService.AddClienteAlta(AltaCliente);
+
+        
+        //var solicitudIng = solicitud;
+        
+        // string subject = "Solicitud de Alta Cliente Nuevo";
+        // string toEmail = "maximiliano_anabalon@hotmail.com.ar";
+        // string cuerpo = $@"
+        //     <p><strong>Nombre y Apellido:</strong> {nomYApell}</p>
+        //     <p><strong>Dirección:</strong> {dire}</p>
+        //     <p><strong>Teléfono:</strong> {tel}</p>
+        //     <p><strong>Email:</strong> {email}</p>
+        // ";
+
+        try
+        {   
+            //Prueba del envio asincronico
+            // Forzar un error lanzando una excepción
+            // throw new Exception("Error forzado para prueba.");
+            // await FailedEmailService.SaveFailedEmailAsync(toEmail, nomYApell, subject, cuerpo, "Pending");
+            // var failedEmailService = new FailedEmailService();
+            // var emailRetryService = new EmailRetryService(failedEmailService);
+            // await emailRetryService.RetryFailedEmails();
+            //await EnviarEmail.EnviarEmailApp(toEmail, subject, cuerpo);
+            
+            var ClienteGuardado = await ClienteAltaService.GetByClientePorTelefono(AltaCliente.Telefono);
+
+            solicitudEnviada = await ClienteAltaService.EnviarAltaCliente(ClienteGuardado);
+            
+            await JS.InvokeVoidAsync("Swal.fire", new
+            {
+                title = "¡Éxito!",
+                text = "¡Nos estaremos comunicando a la brevedad, gracias por confiar en nosotros! AppVendedores2025 Demo",
+                icon = "success",
+                confirmButtonText = "Aceptar"
+            });
+            this.StateHasChanged();
+           
+        }
+        catch (Exception)
+        {
+            
+            //await FailedEmailService.SaveFailedEmailAsync(toEmail, nomYApell, subject, cuerpo, "Pending");
+            await JS.InvokeVoidAsync("Swal.fire", new
+            {
+                title = "Error",
+                text = "Hubo un error al enviar la solicitud. Nos encargaremos de enviarla más tarde.",
+                icon = "error",
+                confirmButtonText = "Aceptar"
+            });
+        }
+       
+    }
+
+
+}

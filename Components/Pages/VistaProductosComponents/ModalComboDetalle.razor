@@ -1,0 +1,348 @@
+@using EntidadesAppVendedores
+@using AppVendedores2025.Shared
+@using AppVendedores2025.Services
+@using System.Globalization;
+
+@inherits UtilCompartidas
+
+@if (comboidActual > 0)
+{
+    <div class="modal fade" id="myModalcombo" data-backdrop="static" data-keyboard="false">
+        <div class="modal-dialog">
+            <div class="modal-content">
+
+                <!-- Header -->
+                <div class="mcd-header">
+                    <button class="mcd-close-btn" onclick="cerrarComboConSlide()" aria-label="Cerrar">
+                        <i class="bi-chevron-down"></i>
+                    </button>
+                    <div class="mcd-header-info">
+                        <div class="mcd-header-code">@AppResources.Combo @ComboHeadItem.Codigo</div>
+                        <div class="mcd-header-name">@ComboHeadItem.NombreCombo</div>
+                    </div>
+                </div>
+
+                <!-- Cantidad del combo -->
+                <div class="mcd-qty-bar">
+                    <span class="mcd-qty-label">@AppResources.CantidadCombos</span>
+                    <div class="mcd-qty-stepper">
+                        <button class="mcd-qty-btn" @onclick="() => OnCantidadCombos.InvokeAsync((null, -1))">&#8722;</button>
+                        <input type="number" class="mcd-qty-input"
+                               name="count" value="@CantidadDeCombo"
+                               @onchange="(args) => OnCantidadCombos.InvokeAsync((args, 0))"
+                               onclick="this.select();" />
+                        <button class="mcd-qty-btn" @onclick="() => OnCantidadCombos.InvokeAsync((null, 1))">+</button>
+                    </div>
+                </div>
+
+                <!-- Lista de precios + CF -->
+                <div class="mcd-config-row">
+                    <select class="mcd-config-select"
+                            @onchange="(args) => OnCambiarLista.InvokeAsync(args)">
+                        @if (!TipoVendedor)
+                        {
+                            @if (TipoVD != 6)
+                            {
+                                @if (ListaaUsar == 3) { <option selected value="3">Autoservicios</option> } else { <option value="3">Autoservicios</option> }
+                                @if (ListaaUsar == 1) { <option selected value="1">Especial Distribucion</option> } else { <option value="1">Especial Distribucion</option> }
+                                @if (ListaaUsar == 5) { <option selected value="5">Almacen</option> } else { <option value="5">Almacen</option> }
+                                @if (ListaaUsar == 6) { <option selected value="6">Kioskos</option> } else { <option value="6">Kioskos</option> }
+                            }
+                            else
+                            {
+                                @if (ListaaUsar == 4) { <option selected value="4">Salon</option> } else { <option value="4">Salon</option> }
+                            }
+                        }
+                        else
+                        {
+                            @if (ListaaUsar == 3) { <option selected value="3">Autoservicios</option> }
+                            @if (ListaaUsar == 1) { <option selected value="1">Especial Distribucion</option> }
+                            @if (ListaaUsar == 5) { <option selected value="5">Almacen</option> }
+                            @if (ListaaUsar == 6) { <option selected value="6">Kioskos</option> }
+                            @if (ListaaUsar == 4) { <option selected value="4">Salon</option> }
+                            @if (ListaaUsar == 7) { <option selected value="7">E-ecommerce</option> }
+                        }
+                    </select>
+
+                    <div class="mcd-cf-group">
+                        @if (!CFenCliente)
+                        {
+                            <label class="mcd-cf-option">
+                                <input type="radio" name="flexRadioDefault3" id="fcnormal"
+                                       checked="!@Cf"
+                                       @onchange="(args) => OnChangeCF.InvokeAsync((args, false))" />
+                                Fac.A
+                            </label>
+                        }
+                        @if (ClienteMCE != 0)
+                        {
+                            <label class="mcd-cf-option">
+                                <input type="radio" name="flexRadioDefault3" id="fccf"
+                                       checked="@Cf"
+                                       @onchange="(args) => OnChangeCF.InvokeAsync((args, true))" />
+                                C.Final
+                            </label>
+                        }
+                    </div>
+                </div>
+
+                <!-- Body scrolleable -->
+                <div class="mcd-body">
+
+                    @if (LsProductosCC.Count <= 0 && LsProductosSC.Count <= 0)
+                    {
+                        <div class="mcd-alert">
+                            <i class="bi-exclamation-triangle"></i>
+                            @AppResources.PorMomentoSinStock
+                        </div>
+                    }
+                    else
+                    {
+                        var lsCC = LsProductosCC.OrderBy(c => c.NroDeGrupoCombo).ToList();
+                        
+
+                        <!-- Productos con cargo -->
+                        <div class="mcd-section-block mcd-section-block-cc">
+                        <div class="mcd-section-title">
+                            <i class="bi-tag-fill"></i>
+                            @AppResources.ProductosConCargo
+                        </div>
+
+                        <div class="mcd-products-grid">
+                            @foreach (ProductoListaItem it in lsCC)
+                            {
+                                string accentClass = it.NroDeGrupoCombo switch {
+                                    0 => "mcd-accent-grupo0",
+                                    1 => "mcd-accent-grupo1",
+                                    2 => "mcd-accent-grupo2",
+                                    _ => "mcd-accent-grupo0"
+                                };
+                                var porcentaje = CalcularPorcentaje(it.PrecioUnitarioFinal(ListaaUsar), it.PrecioFinalCombo(ListaaUsar));
+
+                                <div class="mcd-prod-card">
+                                    <div class="mcd-prod-accent @accentClass"></div>
+                                    <div class="mcd-prod-img-wrap">
+                                        <img class="mcd-prod-img" src="@it.ImagenWeb" alt="@it.Nombre" />
+                                        @if (porcentaje > 0)
+                                        {
+                                            <span class="mcd-prod-badge">-@porcentaje.ToString("N0")%</span>
+                                        }
+                                        @if (it.StockEnUnidades < 1)
+                                        {
+                                            <div class="mcd-prod-sinstock">@AppResources.SinStock!!!</div>
+                                        }
+                                    </div>
+                                    <div class="mcd-prod-info">
+                                        <div class="mcd-prod-name">@it.Nombre</div>
+                                        <div style="@ClassPrecio(it, 1)">$&nbsp;@it.PrecioUnitarioFinal(ListaaUsar)</div>
+                                        <div style="@ClassPrecio(it, 2)" class="mcd-prod-price-combo">$&nbsp;@it.TextoCombo(ListaaUsar)</div>
+                                    </div>
+                                    <div class="mcd-prod-stepper">
+                                        @if (ComboHeadItem.CantidadDinamica != 0 && it.NombreDelCombo != "1")
+                                        {
+                                            <button class="mcd-prod-qty-btn" @onclick="() => OnActualizarCantidadCC.InvokeAsync((null, it, -1))">&#8722;</button>
+                                            <input type="number" class="mcd-prod-qty-input"
+                                                   name="count" value="@it.CantidadEnCarrito"
+                                                   @onchange="(args) => OnActualizarCantidadCC.InvokeAsync((args, it, 0))"
+                                                   onclick="this.select();" />
+                                            <button class="mcd-prod-qty-btn" @onclick="() => OnActualizarCantidadCC.InvokeAsync((null, it, 1))">+</button>
+                                        }
+                                        else
+                                        {
+                                            <input type="number" class="mcd-prod-qty-input"
+                                                   name="count" value="@it.CantidadEnCarrito" readonly />
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                        </div><!-- /mcd-section-block-cc -->
+
+                        <!-- Productos sin cargo -->
+                        @if (LsProductosSC.Count > 0)
+                        {
+                            <div class="mcd-section-block mcd-section-block-sc">
+                            <div class="mcd-section-title">
+                                <i class="bi-gift-fill"></i>
+                                @AppResources.SinCargo
+                            </div>
+
+                            <div class="mcd-products-grid">
+                                @foreach (ProductoListaItem it in LsProductosSC)
+                                {
+                                    <div class="mcd-prod-card">
+                                        <div class="mcd-prod-accent mcd-accent-sc"></div>
+                                        <div class="mcd-prod-img-wrap">
+                                            <img class="mcd-prod-img" src="@it.ImagenWeb" alt="@it.Nombre" />
+                                            <span class="mcd-prod-gratis">@AppResources.Gratis</span>
+                                            @if (it.StockEnUnidades < 1)
+                                            {
+                                                <div class="mcd-prod-sinstock">@AppResources.SinStock!!!</div>
+                                            }
+                                            @if (it.NroDeGrupoCombo == 1)
+                                            {
+                                                <div class="mcd-prod-auto">@AppResources.Automatico</div>
+                                            }
+                                        </div>
+                                        <div class="mcd-prod-info">
+                                            <div class="mcd-prod-name">@it.Nombre</div>
+                                        </div>
+                                        <div class="mcd-prod-stepper">
+                                            @if (it.NombreDelCombo != "1")
+                                            {
+                                                if (it.NroDeGrupoCombo != 1)
+                                                {
+                                                    if (LsProductosSC.Count > 1)
+                                                    {
+                                                        <button class="mcd-prod-qty-btn" @onclick="() => OnActualizarCantidadCC.InvokeAsync((null, it, -1))">&#8722;</button>
+                                                        <input type="number" class="mcd-prod-qty-input"
+                                                               name="count" value="@it.CantidadEnCarrito"
+                                                               @onchange="(args) => OnActualizarCantidadCC.InvokeAsync((args, it, 0))"
+                                                               min="0" onclick="this.select();" />
+                                                        <button class="mcd-prod-qty-btn" @onclick="() => OnActualizarCantidadCC.InvokeAsync((null, it, 1))">+</button>
+                                                    }
+                                                    else
+                                                    {
+                                                        <input type="number" class="mcd-prod-qty-input"
+                                                               name="count" value="@it.CantidadEnCarrito" min="0" readonly />
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    <input type="number" class="mcd-prod-qty-input"
+                                                           name="count" value="@it.CantidadEnCarrito" min="0" readonly />
+                                                }
+                                            }
+                                            else
+                                            {
+                                                <input type="number" class="mcd-prod-qty-input"
+                                                       name="count" value="@it.CantidadEnCarrito" min="0" readonly />
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                            </div><!-- /mcd-section-block-sc -->
+                        }
+                    }
+
+                </div><!-- /mcd-body -->
+
+                <!-- Footer -->
+                <div class="mcd-footer">
+                    @if (!string.IsNullOrEmpty(MsgErrorCombo))
+                    {
+                        <div class="mcd-msg-falta">
+                            <i class="bi-exclamation-circle-fill"></i>
+                            <span>@AppResources.Falta: @MsgErrorCombo</span>
+                        </div>
+                    }
+                    <button class="mcd-grabar-btn"
+                            @onclick="() => OnCerrarCombo.InvokeAsync()">
+                        <i class="bi-check-circle-fill"></i>
+                        @AppResources.Grabar
+                    </button>
+                    <div class="session-watermark">@oParam.Vendedor · @oParam.cliente</div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+
+	// Necesario para la condición de render (equivale a comboidActual en VistaProductos)
+	[Parameter] public int comboidActual { get; set; }
+
+	[Parameter] public CombosHeadItem ComboHeadItem { get; set; } = new CombosHeadItem();
+	[Parameter] public List<ProductoListaItem> LsProductosCC { get; set; } = new();
+	[Parameter] public List<ProductoListaItem> LsProductosSC { get; set; } = new();
+	[Parameter] public int CantidadDeCombo { get; set; }
+	[Parameter] public string MsgErrorCombo { get; set; } = "";
+	[Parameter] public int ListaaUsar { get; set; }
+	[Parameter] public bool TipoVendedor { get; set; }
+	[Parameter] public int TipoVD { get; set; }
+	[Parameter] public bool CFenCliente { get; set; }
+	[Parameter] public bool Cf { get; set; }
+	[Parameter] public int ClienteMCE { get; set; }
+
+	[Parameter] public EventCallback<(ChangeEventArgs, int)> OnCantidadCombos { get; set; }
+	[Parameter] public EventCallback<(ChangeEventArgs, ProductoListaItem, int)> OnActualizarCantidadCC { get; set; }
+	[Parameter] public EventCallback<ChangeEventArgs> OnCambiarLista { get; set; }
+	[Parameter] public EventCallback<(ChangeEventArgs, bool)> OnChangeCF { get; set; }
+	[Parameter] public EventCallback OnCerrarCombo { get; set; }
+	ParametrosServices oParam = new ParametrosServices();
+
+	// Helpers locales (sin estado, solo devuelven CSS)
+	private string SwitchGrupoLocal(int grupo) => grupo switch
+	{
+		0 => "grupo0",
+		1 => "grupo1",
+		2 => "grupo2",
+		_ => ""
+	};
+
+	private decimal CalcularPorcentaje(decimal precioNormal, decimal precioCombo)
+	{
+		// precioCombo puede llegar en 0 (o desactualizado) si el precio de combo
+		// sincronizado no es válido — sin este guard, un precioCombo=0 mostraba
+		// "100% off" y un precioCombo desactualizado podía dar cualquier número
+		// sin sentido (ej. -96%). Si no hay un precio de combo real y menor al
+		// normal, no hay descuento que mostrar.
+		if (precioNormal <= 0 || precioCombo <= 0 || precioCombo >= precioNormal)
+			return 0;
+
+		decimal porcentaje = ((precioNormal - precioCombo) / precioNormal) * 100;
+		return Math.Clamp(porcentaje, 0, 99);
+	}
+
+	public string ClassPrecio(ProductoListaItem it, int tipo)
+	{
+		bool tachar = false;
+		bool mostrardesc = false;
+
+		if (it.PrecioNoCalculado == "N/Calc" && it.PorcentajDescuento1 == 0)
+		{
+			tachar = false;
+			mostrardesc = false;
+		}
+		else
+		{
+			decimal p1 = 0;
+			if (it.TextoCombo(ListaaUsar) != "" && it.TextoCombo(ListaaUsar) != null)
+			{
+				var texto = it.TextoCombo(ListaaUsar)
+							.Trim()
+							.Replace(".", "")
+							.Replace(",", ".");
+				p1 = decimal.Parse(texto, CultureInfo.InvariantCulture);
+			}
+			var p2 = it.PrecioUnitarioFinal(ListaaUsar);
+			var diferencia = Math.Abs(p1 - p2);
+			if (diferencia < 0.30M || p1 == 0)
+			{
+				tachar = false;
+				mostrardesc = false;
+			}
+			else
+			{
+				tachar = true;
+				mostrardesc = true;
+			}
+		}
+
+		string style;
+		if (tipo == 1)
+		{
+			style = tachar
+				? "font-size:12px; text-decoration:line-through; color:#f81404;"
+				: "font-size:12px; color:#888;";
+		}
+		else
+		{
+			style = mostrardesc ? "" : "display:none;";
+		}
+		return style;
+	}
+}

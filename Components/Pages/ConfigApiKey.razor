@@ -1,0 +1,247 @@
+﻿@page "/Config"
+@using System.Net
+@using System.Net.Http.Headers
+@using System.Net.Http.Json
+@using System.IO.Compression
+@using System.Text
+@using Microsoft.Maui.Storage
+@inject IJSRuntime JS
+
+<h3>Configurar y Probar API Key</h3>
+
+<div class="row g-2">
+    <div class="col-12">
+        <label class="form-label">Base URL (ej: http://localhost:5101/ • Android emu: http://10.0.2.2:5101/)</label>
+        <input class="form-control" @bind="baseUrl" />
+    </div>
+
+    <div class="col-md-6">
+        <label class="form-label">HeaderApiKey (ej: x-api-key o Authorization)</label>
+        <input class="form-control" @bind="headerName" />
+    </div>
+
+    <div class="col-md-6">
+        <label class="form-label">ApiKey (se guardará ofuscada)</label>
+        <input class="form-control" @bind="apiKeyPlain" />
+    </div>
+
+    <div class="col-md-6">
+        <label class="form-label">Ruta a probar (relativa)</label>
+        <input class="form-control" @bind="relativePath" />
+    </div>
+
+    <div class="col-12 mt-2">
+        <button class="btn btn-primary me-2" @onclick="Guardar">Guardar</button>
+        <button class="btn btn-outline-secondary me-2" @onclick="MostrarEnmascarada">Mostrar ApiKey (enmascarada)</button>
+        <button class="btn btn-success me-2" @onclick="Probar">Probar ruta</button>
+        <button class="btn btn-outline-danger" @onclick="Borrar">Borrar</button>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(msg))
+{
+    <div class="mt-3">
+        <div class="alert @css">@msg</div>
+    </div>
+}
+
+@code {
+    // ===== Defaults de ejemplo (podés cambiarlos en el UI) =====
+    private string baseUrl = "http://localhost:5101/";
+    private string headerName = "x-api-key";
+    private string apiKeyPlain = "appsdemo2025";
+    private string relativePath = "/ping";
+
+    private string msg = "";
+    private string css = "alert-secondary";
+
+    // ===== Claves para Preferences =====
+    private const string PrefBaseUrl = "cfg_base_url";
+    private const string PrefHeader = "cfg_header_name";
+    private const string PrefKeyObf = "cfg_api_key_obf";
+
+    protected override void OnInitialized()
+    {
+        try
+        {
+            baseUrl = Preferences.Get(PrefBaseUrl, baseUrl);
+            headerName = Preferences.Get(PrefHeader, headerName);
+            var obf = Preferences.Get(PrefKeyObf, null);
+            if (!string.IsNullOrWhiteSpace(obf))
+                apiKeyPlain = Deobfuscate(obf); // mostramos en claro en el input
+        }
+        catch (Exception ex)
+        {
+            css = "alert-danger";
+            msg = $"No se pudieron leer preferencias: {ex.Message}";
+        }
+    }
+
+    private Task Guardar()
+    {
+        msg = ""; css = "alert-secondary";
+        try
+        {
+            var url = NormalizeBaseUrl(baseUrl);
+            if (!Uri.TryCreate(url, UriKind.Absolute, out _))
+                throw new ArgumentException("Base URL inválida.");
+
+            if (string.IsNullOrWhiteSpace(headerName))
+                throw new ArgumentException("HeaderApiKey no puede estar vacío.");
+
+            if (string.IsNullOrWhiteSpace(apiKeyPlain))
+                throw new ArgumentException("ApiKey no puede estar vacía.");
+
+            Preferences.Set(PrefBaseUrl, url);
+            Preferences.Set(PrefHeader, headerName.Trim());
+            Preferences.Set(PrefKeyObf, Obfuscate(apiKeyPlain.Trim()));
+
+            css = "alert-success";
+            msg = "Guardado en Preferences (ApiKey ofuscada).";
+        }
+        catch (Exception ex)
+        {
+            css = "alert-danger";
+            msg = $"Error al guardar: {ex.Message}";
+        }
+        return Task.CompletedTask;
+    }
+
+    private async Task MostrarEnmascarada()
+    {
+        try
+        {
+            var masked = Mask(apiKeyPlain);
+            await JS.InvokeVoidAsync("alert", $"ApiKey (enmascarada): {masked}");
+            css = "alert-success";
+            msg = "ApiKey leída y enmascarada correctamente.";
+        }
+        catch (Exception ex)
+        {
+            css = "alert-danger";
+            msg = $"Error al mostrar: {ex.Message}";
+        }
+    }
+
+    private async Task Probar()
+    {
+        msg = ""; css = "alert-secondary";
+        try
+        {
+            var url = Preferences.Get(PrefBaseUrl, NormalizeBaseUrl(baseUrl));
+            var header = Preferences.Get(PrefHeader, headerName);
+            var obf = Preferences.Get(PrefKeyObf, null);
+
+            if (string.IsNullOrWhiteSpace(url) || !Uri.TryCreate(url, UriKind.Absolute, out _))
+                throw new ArgumentException("Base URL inválida (guardala primero).");
+
+            if (string.IsNullOrWhiteSpace(header))
+                throw new ArgumentException("HeaderApiKey no configurado.");
+
+            var key = string.IsNullOrWhiteSpace(obf) ? apiKeyPlain : Deobfuscate(obf);
+            if (string.IsNullOrWhiteSpace(key))
+                throw new ArgumentException("ApiKey no configurada.");
+
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30), BaseAddress = new Uri(url) };
+            http.DefaultRequestHeaders.UserAgent.ParseAdd("AppVendedores/1.0");
+
+            using var req = new HttpRequestMessage(HttpMethod.Get, relativePath?.TrimStart('/') ?? "api/ping");
+
+            if (header.Equals("Authorization", StringComparison.OrdinalIgnoreCase))
+                req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
+            else
+            {
+                req.Headers.Remove(header);
+                req.Headers.Add(header, key);
+            }
+
+            using var res = await http.SendAsync(req);
+
+            if (res.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+            {
+                var detail = await SafeRead(res);
+                css = "alert-danger";
+                msg = $"No autorizado ({(int)res.StatusCode}). Detalle: {detail}";
+                return;
+            }
+
+            res.EnsureSuccessStatusCode();
+
+            var body = await res.Content.ReadAsStringAsync();
+            css = "alert-success";
+            msg = $"OK {(int)res.StatusCode}. Respuesta: {body}";
+            await JS.InvokeVoidAsync("alert", "OK");
+        }
+        catch (TaskCanceledException ex)
+        {
+            css = "alert-danger";
+            msg = $"Timeout al llamar a la API: {ex.Message}";
+        }
+        catch (HttpRequestException ex)
+        {
+            css = "alert-danger";
+            msg = $"Error de red/HTTP: {ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            css = "alert-danger";
+            msg = $"Error inesperado: {ex.Message}";
+        }
+    }
+
+    private Task Borrar()
+    {
+        try
+        {
+            Preferences.Remove(PrefBaseUrl);
+            Preferences.Remove(PrefHeader);
+            Preferences.Remove(PrefKeyObf);
+            css = "alert-warning";
+            msg = "Preferencias eliminadas.";
+        }
+        catch (Exception ex)
+        {
+            css = "alert-danger";
+            msg = $"Error al borrar: {ex.Message}";
+        }
+        return Task.CompletedTask;
+    }
+
+    // ===== Utilidades =====
+
+    private static string NormalizeBaseUrl(string url)
+      => string.IsNullOrWhiteSpace(url) ? "" : (url.EndsWith("/") ? url : url + "/");
+
+    private static string Mask(string? t, int pre = 3, int post = 3)
+    {
+        if (string.IsNullOrWhiteSpace(t)) return "<vacío>";
+        if (t.Length <= pre + post) return new string('•', t.Length);
+        return t[..pre] + new string('•', t.Length - pre - post) + t[^post..];
+    }
+
+    private static async Task<string> SafeRead(HttpResponseMessage res)
+    {
+        try { return await res.Content.ReadAsStringAsync(); }
+        catch { return "<sin detalle>"; }
+    }
+
+    // Ofuscación simple (NO es cifrado): GZip + Base64
+    private static string Obfuscate(string plain)
+    {
+        var bytes = Encoding.UTF8.GetBytes(plain);
+        using var ms = new MemoryStream();
+        using (var gz = new GZipStream(ms, CompressionLevel.SmallestSize, leaveOpen: true))
+            gz.Write(bytes, 0, bytes.Length);
+        return Convert.ToBase64String(ms.ToArray());
+    }
+
+    private static string Deobfuscate(string base64)
+    {
+        var comp = Convert.FromBase64String(base64);
+        using var msIn = new MemoryStream(comp);
+        using var gz = new GZipStream(msIn, CompressionMode.Decompress);
+        using var msOut = new MemoryStream();
+        gz.CopyTo(msOut);
+        return Encoding.UTF8.GetString(msOut.ToArray());
+    }
+}

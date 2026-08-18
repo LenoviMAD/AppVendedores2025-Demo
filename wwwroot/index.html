@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head class="header-safe">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <title>AppVendedores2025</title>
+    <base href="/" />
+
+    <!-- 1 Agregado AppAnt-->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/all.css" />
+
+    <!-- Bootstrap 4 CSS (lo mantenemos porque lo tenías) -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" />
+
+    <!-- jQuery + Popper + Bootstrap 4 JS (los mantenemos porque lo tenías) -->
+    <script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js"></script>
+
+    <!--sweet alert-->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.0.18/dist/sweetalert2.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11.0.18/dist/sweetalert2.min.css" />
+
+    <!--js script-->
+    <script async defer
+        src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&libraries=places"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/swiffy-slider@1.6.0/dist/js/swiffy-slider.min.js" crossorigin="anonymous"
+        defer></script>
+    <link href="https://cdn.jsdelivr.net/npm/swiffy-slider@1.6.0/dist/css/swiffy-slider.min.css" rel="stylesheet"
+        crossorigin="anonymous">
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif:ital@1&display=swap" rel="stylesheet">
+
+    <meta http-equiv="Cache-Control" content="public, max-age=31536000" />
+    <meta http-equiv="Expires" content="Tue, 01 Jan 2030 00:00:00 GMT" />
+
+    <!--  1  Agregado AppAnt-->
+
+    <link rel="stylesheet" href="css/app.css" />
+
+    <!-- 2 Agregado AppAnt-->
+    <link href="css/styleecom.css" rel="stylesheet" />
+    <link href="css/processingModal.css" rel="stylesheet" />
+    <!-- 2  Agregado AppAnt-->
+
+    <link rel="stylesheet" href="AppVendedores2025.styles.css" />
+
+    <!-- Estilos centralizados de componentes (migrados desde bloques <style> inline) -->
+    <link href="css/components.css" rel="stylesheet" />
+
+    <!-- 3 Agregado AppAnt-->
+    <link href="css/nav.css" rel="stylesheet" />
+    <!--<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">-->
+    <!-- Bootstrap 5 CSS (lo mantenemos porque lo tenías) -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Owl carousel CSS (lo mantenemos tal cual) -->
+    <link rel="stylesheet" href="js\dist\assets\owl.carousel.min.css">
+    <link rel="stylesheet" href="js\dist\assets\owl.theme.default.min.css">
+    <!-- 3 Agregado AppAnt-->
+
+    <link rel="icon" href="data:,">
+
+
+
+    <!-- Blazor WebView (lo mantenemos tal cual) -->
+    <script src="_framework/blazor.webview.js" autostart="false"></script>
+
+    <!-- 4 Agregado AppAnt-->
+    <!-- ✅ Bootstrap 5 bundle DEBE estar antes del init del carrusel -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+
+    <!-- ✅ Mantengo tu script (NO lo elimino). OJO: puede fallar por ruta/orden, por eso agregamos otro al final -->
+    <!--<script src="../wwwroot/js/catCarouselInit.js"></script>-->
+
+    <!-- ✅ FIX: asegurar que catCarouselInit esté cargado DESPUÉS de bootstrap.bundle -->
+    <!-- (No borro el de arriba, lo duplico a propósito para garantizar disponibilidad) -->
+    <script src="../js/catCarouselInit.js?v=2"></script>
+    <!-- Owl carousel JS (lo mantenemos tal cual) -->
+    <script src="js\dist\owl.carousel.min.js"></script>
+
+    <!-- utils / gmaps -->
+    <script src="../js/utils.js" defer></script>
+    <script src="../js/gmaps.js" defer></script>
+    <script src="../js/gmaps_alta.js" defer></script>
+
+    <script src="js/i18n.js"></script>
+
+    <!--<script src="../js/audiorecord.js"></script>-->
+    <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" rel="stylesheet" />
+    <!-- 4 Agregado AppAnt-->
+
+</head>
+
+<body class="fullscreen">
+
+    <div class="status-bar-safe-area"></div>
+    <!-- 4 Agregado AppAnt-->
+
+    <div id="app">
+        <div class="spinner-container">
+            <!-- Nombre de la app -->
+            <div class="app-brand">
+                <span class="distri">Demo</span><span class="sur"> Ventas</span>
+            </div>
+
+            <!-- Ring spinner -->
+            <div class="spinner"></div>
+
+            <!-- Texto cargando -->
+            <div class="cargando" data-i18n="LabelCargando">Cargando...</div>
+        </div>
+    </div>
+    <!-- 4 Agregado AppAnt-->
+    <!--<div id="app">Loading...</div>-->
+
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="" class="reload">Reload</a>
+        <a class="dismiss">🗙</a>
+    </div>
+
+</body>
+
+</html>

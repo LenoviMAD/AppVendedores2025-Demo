@@ -1,0 +1,25 @@
+# .NET / MAUI
+bin/
+obj/
+*.user
+*.suo
+.vs/
+.cr/
+
+# Logs y diagnóstico
+*.log
+restore.log
+
+# Secretos — NUNCA commitear
+.env
+.env.*
+wwwroot/js/certs/
+appsettings.Development.json
+
+# Publish output
+publish/
+out/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,268 @@
+@using EntidadesAppVendedores
+@using AppVendedores2025.Shared
+@using AppVendedores2025.Services
+
+@inherits UtilCompartidas
+
+<div class="modal fade" id="modalcarrito" data-backdrop="static" data-keyboard="false">
+    <div class="modal-dialog">
+        <div class="modal-content">
+
+            <!-- Header -->
+            <div class="mc-header">
+                <button class="mc-close-btn" onclick="cerrarCarritoConSlide()" aria-label="Cerrar">
+                    <i class="bi-chevron-down"></i>
+                </button>
+                <div class="mc-header-title">
+                    <i class="bi-cart3"></i>
+                    <span>@AppResources.Carrito</span>
+                </div>
+                <div class="mc-subtotal-wrap">
+                    <span class="mc-subtotal-label">Subtotal</span>
+                    <span class="mc-subtotal-value">$&nbsp;@TotalCarrito</span>
+                </div>
+            </div>
+
+            <!-- Cuerpo scrolleable -->
+            <div class="mc-body">
+
+                <!-- Productos -->
+                <div class="mc-section-title">
+                    <i class="bi-bag"></i>
+                    @AppResources.Productos
+                    <button class="mc-clear-btn" @onclick="() => OnBorrarCart.InvokeAsync(0)">
+                        <i class="bi-trash3"></i> @AppResources.Vaciar
+                    </button>
+                </div>
+
+                @foreach (ProductoListaItem it in CartView)
+                {
+                    <div class="mc-item">
+                        <div class="mc-item-img-wrap">
+                            <button class="mc-item-del" @onclick="() => OnBorrarProducto.InvokeAsync(it.ProductosID)">
+                                <i class="bi-x"></i>
+                            </button>
+                            <img class="mc-item-img"
+                                 @onclick="() => OnAbrirProducto.InvokeAsync(it.ProductosID)"
+                                 src="@it.ImagenWeb" />
+                        </div>
+                        <div class="mc-item-info" @onclick="() => OnAbrirProducto.InvokeAsync(it.ProductosID)">
+                            <div class="mc-item-name">@it.Nombre</div>
+                            <span class="mc-item-code">@it.CodigoDeProducto</span>
+                            <div class="mc-item-meta">
+                                @MostrarLista(@it.ListaDePreciosUsada) &mdash;
+                                @if (@it.CF) { <span>B</span> } else { <span>A</span> }
+                            </div>
+                            <div class="mc-item-price">$@it.TotalLinea</div>
+                        </div>
+                        <div class="mc-item-qty">
+                            <button class="mc-qty-btn" @onclick="() => OnActualizarCantidad.InvokeAsync((null, it, 1))">+</button>
+                            <input type="number" class="mc-qty-input" name="count" min="1"
+                                   value="@GetQtyLocal(it.ProductosID, it.CantidadEnCarrito)"
+                                   @oninput="(args) => SetQtyLocal(it.ProductosID, args)"
+                                   @onchange="(args) => CommitQty(args, it)"
+                                   onclick="this.select();" />
+                            <button class="mc-qty-btn" @onclick="() => OnActualizarCantidad.InvokeAsync((null, it, -1))">&#8722;</button>
+                        </div>
+                    </div>
+                }
+
+                <!-- Combos -->
+                @if (CartViewCombos.Any())
+                {
+                    <div class="mc-section-title">
+                        <i class="bi-gift"></i> @AppResources.Combos
+                    </div>
+                    <div class="mc-combos">
+                        @{
+                            string nombreCombo = "";
+                            string nombreComboAct = "";
+                            bool linecomboLocal = true;
+                        }
+                        @foreach (ProductoListaItem it in CartViewCombos)
+                        {
+                            nombreComboAct = it.NombreDelCombo;
+                            if (nombreCombo != nombreComboAct)
+                            {
+                                nombreCombo = nombreComboAct;
+                                <div class="mc-combo-header"
+                                     style="background-color:@CambiarColorCombosLocal(ref linecomboLocal)">
+                                    <button class="mc-item-del-sm"
+                                            @onclick="() => OnBorrarCombo.InvokeAsync(it.ComboID)">
+                                        <i class="bi-x-circle"></i>
+                                    </button>
+                                    <span class="mc-combo-name">@nombreCombo | @it.ComboCodigo</span>
+                                    @if (it.ConCargo)
+                                    {
+                                        <span class="mc-combo-total">$@GetTolalLineaCombo(CartViewCombos, it)</span>
+                                    }
+                                </div>
+                            }
+                            <div class="mc-combo-item">
+                                <img class="mc-combo-img" src="@it.ImagenWeb" />
+                                <div class="mc-combo-info">
+                                    <div class="mc-item-name">@it.Nombre</div>
+                                    <span class="mc-item-code">@it.CodigoDeProducto</span>
+                                    <div class="mc-item-meta">
+                                        @MostrarLista(@it.ListaDePreciosUsada) &mdash;
+                                        @if (@it.CF) { <span>B</span> } else { <span>A</span> }
+                                    </div>
+                                    @if (it.TotalLinea == 0)
+                                    {
+                                        <span class="mc-combo-sincargo">Sin Cargo</span>
+                                    }
+                                    else
+                                    {
+                                        <div class="mc-item-price">$@it.TotalLinea</div>
+                                    }
+                                </div>
+                                <span class="mc-combo-qty">x @it.CantidadEnCarrito</span>
+                            </div>
+                        }
+                    </div>
+                }
+
+            </div><!-- /mc-body -->
+
+            <!-- Footer -->
+            <div class="mc-footer">
+
+                @if (TipoVendedor && ListaaUsar == 7)
+                {
+                    <div class="mc-totals">
+                        @{var x = 1;}
+                        @foreach (var lisPerc in ListaPercepcionesCalculadas)
+                        {
+                            @if (lisPerc.montoCalculado > 0)
+                            {
+                                @if (x == 1)
+                                {
+                                    <div class="mc-total-row">
+                                        <span>Subtotal:</span>
+                                        <span>$&nbsp;@TotalCarrito.ToString("N2")</span>
+                                    </div>
+                                    x = 0;
+                                }
+                                <div class="mc-total-row">
+                                    <span>@lisPerc.descripcion.ToString() @lisPerc.porcentaje.ToString("N0")%:</span>
+                                    <span>$&nbsp;@lisPerc.montoCalculado.ToString("N2")</span>
+                                </div>
+                            }
+                        }
+                    </div>
+
+                    <div class="mc-dia-selector">
+                        <label for="diasSemana">
+                            <i class="bi-calendar3"></i> Día de entrega:
+                        </label>
+                        <select id="diasSemana"
+                                @onchange="(args) => OnActualizarDia.InvokeAsync(args)"
+                                disabled="@((TotalCarrito <= 0))">
+                            @foreach (var dia in DiasDisponibles)
+                            {
+                                <option value="@dia.ToString("yyyy-MM-dd")">@dia.ToShortDateString()</option>
+                            }
+                        </select>
+                    </div>
+                }
+
+                <div class="mc-grand-total">
+                    <span class="mc-grand-total-label">Total:</span>
+                    <span class="mc-grand-total-value">$&nbsp;@TotalCarritoFinal.ToString("N2")</span>
+                </div>
+
+                <button class="mc-transmit-btn"
+                        @onclick="TransmitirAsync">
+                    <i class="bi-send-fill"></i>
+                    @NombreBoton
+                </button>
+
+                <ProcessingModal IsVisible="IsModalVisible" Progress="Progress" OnClose="OnCloseModal" />
+
+            </div><!-- /mc-footer -->
+
+        </div>
+    </div>
+</div>
+
+@code {
+
+	[Parameter] public List<ProductoListaItem> CartView { get; set; } = new();
+	[Parameter] public List<ProductoListaItem> CartViewCombos { get; set; } = new();
+	[Parameter] public decimal TotalCarrito { get; set; }
+	[Parameter] public decimal TotalCarritoFinal { get; set; }
+	[Parameter] public decimal TotalCarritoNeto { get; set; }
+	[Parameter] public List<Percepciones> ListaPercepcionesCalculadas { get; set; } = new();
+	[Parameter] public bool TipoVendedor { get; set; }
+	[Parameter] public int ListaaUsar { get; set; }
+	[Parameter] public List<DateTime> DiasDisponibles { get; set; } = new();
+	[Parameter] public string NombreBoton { get; set; } = "";
+	[Parameter] public bool IsModalVisible { get; set; }
+	[Parameter] public int Progress { get; set; }
+
+	[Parameter] public EventCallback<int> OnBorrarCart { get; set; }
+	[Parameter] public EventCallback<int> OnBorrarProducto { get; set; }
+	[Parameter] public EventCallback<int> OnBorrarCombo { get; set; }
+	[Parameter] public EventCallback<(ChangeEventArgs, ProductoListaItem, int)> OnActualizarCantidad { get; set; }
+	[Parameter] public EventCallback<ChangeEventArgs> OnActualizarDia { get; set; }
+	[Parameter] public EventCallback<(decimal, decimal)> OnTransmitir { get; set; }
+	[Parameter] public EventCallback<List<(int, int)>> OnSincronizarYTransmitir { get; set; }
+	[Parameter] public EventCallback<int> OnAbrirProducto { get; set; }
+	[Parameter] public EventCallback OnCloseModal { get; set; }
+
+	private readonly Dictionary<int, int> _localQtys = new();
+	private readonly HashSet<int> _dirtyIds = new();
+
+	protected override void OnParametersSet()
+	{
+		foreach (var it in CartView)
+		{
+			if (!_dirtyIds.Contains(it.ProductosID))
+				_localQtys[it.ProductosID] = it.CantidadEnCarrito;
+		}
+	}
+
+	private int GetQtyLocal(int id, int fallback)
+		=> _localQtys.TryGetValue(id, out var v) ? v : fallback;
+
+	private void SetQtyLocal(int id, ChangeEventArgs args)
+	{
+		if (int.TryParse(args.Value?.ToString(), out var qty) && qty >= 1)
+		{
+			_localQtys[id] = qty;
+			_dirtyIds.Add(id);
+		}
+	}
+
+	private async Task CommitQty(ChangeEventArgs args, ProductoListaItem it)
+	{
+		_dirtyIds.Remove(it.ProductosID);
+		await OnActualizarCantidad.InvokeAsync((args, it, 0));
+	}
+
+	private async Task TransmitirAsync()
+	{
+		var pendientes = CartView
+			.Where(it => _dirtyIds.Contains(it.ProductosID))
+			.Select(it => (it.ProductosID, _localQtys.TryGetValue(it.ProductosID, out var q) ? q : it.CantidadEnCarrito))
+			.ToList();
+
+		if (pendientes.Count > 0)
+			await OnSincronizarYTransmitir.InvokeAsync(pendientes);
+		else
+			await OnTransmitir.InvokeAsync((TotalCarritoFinal, TotalCarritoNeto));
+	}
+
+	// helper local para alternar colores de combo (no modifica estado del padre)
+	private string CambiarColorCombosLocal(ref bool flag)
+	{
+		if (flag) { flag = false; return "#f4d392"; }
+		flag = true; return "#b7cd78";
+	}
+
+	// helper para total de línea de combo (mismo cálculo que en el padre)
+	private decimal GetTolalLineaCombo(List<ProductoListaItem> combos, ProductoListaItem it)
+	{
+		return combos.Where(c => c.NombreDelCombo == it.NombreDelCombo && c.ConCargo).Sum(c => c.TotalLinea);
+	}
+}

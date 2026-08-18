@@ -1,0 +1,274 @@
+@using AppVendedores2025.Resources.Strings
+@using EntidadesAppVendedores
+
+<!-- Elementos legacy: se mantienen en el DOM pero se ocultan vía CSS -->
+<div id="fondoMicuenta">
+    <div id="logocamion"></div>
+</div>
+<div id="selectLenguaje">
+    <LanguageSelect />
+</div>
+
+<div class="dash-wrapper">
+
+    <!-- Selector de idioma (top-right) -->
+    <div class="language-selector">
+        <LanguageSelect />
+    </div>
+
+    <!-- Header con logo -->
+    <div class="dash-header">
+        <img src="img/vendixIcono.png" alt="AppVendedores2025 Demo" class="dash-logo" />
+    </div>
+
+    @if (!EsUnClienteX)
+    {
+        <!-- Vista Vendedor -->
+
+        <!-- Mensaje de bienvenida -->
+        <div class="dash-welcome">
+            @AppResources.Bienvenido
+            <span class="dash-welcome-sub">@AppResources.SubtituloBienvenido</span>
+        </div>
+
+        <!-- Comisión y estrellas -->
+        <div class="dash-stars-block">
+            <span style="text-align:center; text-shadow: 2px 2px 4px black, -1px -1px 4px black, 1px -1px 4px black, -1px 1px 4px black, 1px 1px 4px black;">
+                <h2 style="color:@(ColorCoeficienteComision ? "#FFC90E" : "#ff471a"); font-weight: bold; font-size: 40px; margin: 0;">@ComisionVendedoresString</h2>
+            </span>
+            <div style="display: flex; justify-content: center; align-items: center; margin-top: 4px;">
+                @for (int i = 1; i <= 6; i++)
+                {
+                    var opacity = GetOpacity(i);
+                    <span style="margin: 0 4px;">
+                        <img src="img/estrella2.png" alt="Estrella" style="@opacity; height: 30px; width: 30px;" />
+                    </span>
+                }
+            </div>
+        </div>
+
+        <!-- Personaje central -->
+        <img src="img/personaIndex.png" alt="Vendedor" class="dash-person" />
+
+        <!-- Tarjeta principal: Clientes -->
+        <a @onclick="OnClientesClick" class="dash-main-card">
+            <i class="bi-shop dash-main-card-icon"></i>
+            <div class="dash-main-card-body">
+                <p class="dash-main-card-title">@AppResources.Clientes</p>
+                <p class="dash-main-card-sub">@AppResources.SubClientesTarjeta</p>
+            </div>
+            <i class="bi-chevron-right dash-main-card-arrow"></i>
+            @if (CuentaSinPedido > 0)
+            {
+                <span class="dash-badge">@CuentaSinPedido</span>
+            }
+        </a>
+
+        <!-- Tarjeta secundaria: Pedidos -->
+        <a @onclick="OnPedidosClick" class="dash-main-card">
+            <i class="bi-bag-check dash-main-card-icon"></i>
+            <div class="dash-main-card-body">
+                <p class="dash-main-card-title">@AppResources.Pedidos</p>
+                <p class="dash-main-card-sub">@AppResources.SubPedidosTarjeta</p>
+            </div>
+            <i class="bi-chevron-right dash-main-card-arrow"></i>
+            @if (CantPedSinTX > 0)
+            {
+                <span class="dash-badge">@CantPedSinTX</span>
+            }
+        </a>
+
+        <!-- wrapperIndex: mantiene binding hidden="@ShowMenuusr" e IDs originales -->
+        <div class="wrapperIndex" hidden="@ShowMenuusr">
+            <div id="botonSincronizar" @onclick="OnSincronizarManualClick" class="dash-small-card">
+                <i class="bi-arrow-repeat dash-small-card-icon"></i>
+                <span class="dash-small-card-label">@AppResources.Sincronizar</span>
+            </div>
+            <a id="botonMiCuenta" @onclick="OnAbrirHomeVDClick" class="dash-small-card">
+                <i class="bi-person-circle dash-small-card-icon"></i>
+                <span class="dash-small-card-label">@AppResources.MiCuenta</span>
+            </a>
+        </div>
+
+        <!-- Grid de 3 botones de acción: mantiene binding hidden="@ShowMenuusr" -->
+        <div class="wrapperBTN" hidden="@ShowMenuusr">
+            <button class="dash-small-card"
+                    @onclick="OnForzarSincronizacionClick">
+                <i class="bi-cloud-download dash-small-card-icon"></i>
+                <span class="dash-small-card-label">@AppResources.Actualizar</span>
+                <span class="dash-small-card-sub">@AppResources.ForzarSync</span>
+            </button>
+            <button class="dash-small-card btnSoporte" @onclick="OnAbrirModalSoporteClick">
+                <i class="bi-headset dash-small-card-icon"></i>
+                <span class="dash-small-card-label">@AppResources.Soporte</span>
+                <span class="dash-small-card-sub">@AppResources.SubSoporteTarjeta</span>
+            </button>
+            <button class="dash-small-card" id="botonLogoff" @onclick="OnLogOffClick">
+                <i class="bi-box-arrow-right dash-small-card-icon"></i>
+                <span class="dash-small-card-label">@AppResources.Salir</span>
+                <span class="dash-small-card-sub">@AppResources.SubSalirTarjeta</span>
+            </button>
+        </div>
+
+        <!-- Panel de datos del usuario (debajo de los botones) -->
+        @* <div class="dash-info-panel">
+            <div class="dash-info-row">
+                <div class="dash-info-col">
+                    <p class="letrasmaller">@VdLogueadoCodigo</p>
+                    <p class="letrasmaller">v: @VersionAplicacion</p>
+                    <p class="letrasmaller">v Db: @VersionDatos</p>
+                    <p class="letrasmaller">@UltimaSyncString</p>
+                    <p class="letrasmaller">@MensajeError</p>
+                </div>
+                <div class="dash-info-col">
+                    <p class="letrasmaller">@AppResources.ListaPredeterminada</p>
+                    <select class="dash-info-select" @onchange="OnCambiarLista">
+                        @if (TipoVD != 6)
+                        {
+                            <option selected value="@ListadePrecios">@ListadePreciosNombre</option>
+                        }
+                        @foreach (var item in ListasParaUsar)
+                        {
+                            <option value="@item.listaID">@item.nombreDeLaLista</option>
+                        }
+                    </select>
+                </div>
+            </div>
+        </div> *@
+
+        <!-- Panel de estado de sincronización -->
+        @* <div class="dash-sync-panel">
+            <i class="bi bi-arrow-repeat"></i>
+            <span>Sincronizá para tener la información más actualizada disponible.</span>
+        </div> *@
+
+        
+    }
+    else
+    {
+        <!-- Vista Cliente (autogestión) -->
+
+        <!-- Mensaje de bienvenida -->
+        <div class="dash-welcome">
+            @AppResources.Bienvenido
+            <span class="dash-welcome-sub">@AppResources.SubtituloBienvenido</span>
+        </div>
+
+        <!-- Personaje central -->
+        <img src="img/personaIndex.png" alt="Cliente" class="dash-person" />
+
+        <!-- Tarjeta principal: Ingresar -->
+        <a @onclick="OnIngresarClick" class="dash-main-card pulseIngresar">
+            <i class="bi-bag-fill dash-main-card-icon"></i>
+            <div class="dash-main-card-body">
+                <p class="dash-main-card-title">@AppResources.Ingresar</p>
+                <p class="dash-main-card-sub">@AppResources.SubIngresarTarjeta</p>
+            </div>
+            <i class="bi-chevron-right dash-main-card-arrow"></i>
+        </a>
+
+        <!-- Tarjeta secundaria: Últimos Pedidos -->
+        <a @onclick="OnPedidosClick" class="dash-main-card">
+            <i class="bi-clock-history dash-main-card-icon"></i>
+            <div class="dash-main-card-body">
+                <p class="dash-main-card-title">@AppResources.UltimosPedidos</p>
+                <p class="dash-main-card-sub">@AppResources.SubUltimosPedidosTarjeta</p>
+            </div>
+            <i class="bi-chevron-right dash-main-card-arrow"></i>
+            @if (CantPedSinTX > 0)
+            {
+                <span class="dash-badge">@CantPedSinTX</span>
+            }
+        </a>
+
+        <!-- Grid de 3 botones de acción: mantiene binding hidden="@ShowMenuusr" -->
+        <div class="wrapperBTN" hidden="@ShowMenuusr">
+            <button class="dash-small-card btnSincroniManualCli" @onclick="OnSincronizarManualClick">
+                <i class="bi-arrow-repeat dash-small-card-icon"></i>
+                <span class="dash-small-card-label">@AppResources.Sincronizar</span>
+                <span class="dash-small-card-sub">@AppResources.SubSincronizarTarjeta</span>
+            </button>
+            <button class="dash-small-card btnSoporte" @onclick="OnAbrirModalSoporteClick">
+                <i class="bi-headset dash-small-card-icon"></i>
+                <span class="dash-small-card-label">@AppResources.Soporte</span>
+                <span class="dash-small-card-sub">@AppResources.SubSoporteTarjeta</span>
+            </button>
+            <button class="dash-small-card" id="botonLogoff" @onclick="OnLogOffClick">
+                <i class="bi-box-arrow-right dash-small-card-icon"></i>
+                <span class="dash-small-card-label">@AppResources.Salir</span>
+                <span class="dash-small-card-sub">@AppResources.SubSalirTarjeta</span>
+            </button>
+        </div>
+
+        <!-- Panel de estado de sincronización -->
+       @*  <div class="dash-sync-panel">
+            <i class="bi bi-arrow-repeat"></i>
+            <span>Sincronizá para tener la información más actualizada disponible.</span>
+        </div> *@
+    }
+    
+    <!-- Eliminar Cuenta -->
+        @if (!oParam.botonEliminar)
+        {
+            <div class="dash-delete-link">
+                <button class="dash-small-card dash-small-card--danger"
+                        @onclick="OnEliminarCuentaClick">
+                    <i class="bi-trash3 dash-small-card-icon"></i>
+                    <span class="dash-small-card-label">@AppResources.EliminarCuenta</span>
+                </button>
+            </div>
+        }
+
+</div>
+
+@code {
+    [Parameter] public bool EsUnClienteX { get; set; }
+    [Parameter] public int CuentaSinPedido { get; set; }
+    [Parameter] public bool PrimerIngre { get; set; }
+    [Parameter] public string ComisionVendedoresString { get; set; } = "";
+    [Parameter] public bool ColorCoeficienteComision { get; set; }
+    [Parameter] public int CantPedSinTX { get; set; }
+    [Parameter] public bool ShowMenuusr { get; set; }
+    [Parameter] public string VdLogueadoCodigo { get; set; } = "";
+    [Parameter] public string VersionAplicacion { get; set; } = "";
+    [Parameter] public string VersionDatos { get; set; } = "";
+    [Parameter] public string UltimaSyncString { get; set; } = "";
+    [Parameter] public string MensajeError { get; set; } = "";
+    [Parameter] public int ListadePrecios { get; set; }
+    [Parameter] public string ListadePreciosNombre { get; set; } = "";
+    [Parameter] public int TipoVD { get; set; }
+    [Parameter] public IEnumerable<(int listaID, string nombreDeLaLista)> ListasParaUsar { get; set; } = new List<(int listaID, string nombreDeLaLista)>();
+
+    [Parameter] public string Opacity01 { get; set; } = "";
+    [Parameter] public string Opacity02 { get; set; } = "";
+    [Parameter] public string Opacity03 { get; set; } = "";
+    [Parameter] public string Opacity04 { get; set; } = "";
+    [Parameter] public string Opacity05 { get; set; } = "";
+    [Parameter] public string Opacity06 { get; set; } = "";
+    
+
+    [Parameter] public EventCallback OnEliminarCuentaClick { get; set; }
+    [Parameter] public EventCallback OnClientesClick { get; set; }
+    [Parameter] public EventCallback OnPedidosClick { get; set; }
+    [Parameter] public EventCallback OnSincronizarManualClick { get; set; }
+    [Parameter] public EventCallback OnAbrirHomeVDClick { get; set; }
+    [Parameter] public EventCallback OnIngresarClick { get; set; }
+    [Parameter] public EventCallback<ChangeEventArgs> OnCambiarLista { get; set; }
+    [Parameter] public EventCallback OnForzarSincronizacionClick { get; set; }
+    [Parameter] public EventCallback OnAbrirModalSoporteClick { get; set; }
+    [Parameter] public EventCallback OnLogOffClick { get; set; }
+          
+
+    ParametrosServices oParam = new ParametrosServices();
+
+    private string GetOpacity(int index) => index switch
+    {
+        1 => Opacity01,
+        2 => Opacity02,
+        3 => Opacity03,
+        4 => Opacity04,
+        5 => Opacity05,
+        6 => Opacity06,
+        _ => "opacity: 0.4"
+    };
+}

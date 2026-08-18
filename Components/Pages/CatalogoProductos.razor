@@ -1,0 +1,1187 @@
+@page "/catalogoProductos"
+
+@inherits UtilCompartidas
+@using AppVendedores2025.Services
+@using AppVendedores2025.Shared
+@using EntidadesAppVendedores
+@using Microsoft.AspNetCore.Components.Web
+@using AppVendedores2025.Components.Pages.VistaProductosComponents
+@using Microsoft.JSInterop
+@using Newtonsoft.Json;
+@using System.Diagnostics;
+@using MercadoPago.Resource.Preference;
+@using System.Text
+
+@inject IProductoListaItem oProductoListaService
+@inject IJSRuntime JS
+@inject NavigationManager _navigationManager
+@inject ICombosItemService oCombosItemService
+@inject MercadoPagoService PagoService
+
+@if (!_inicializado)
+{
+    <div id="app">
+        <div class="spinner-container">
+            <div>
+                <span class="distri">Demo</span><span class="sur"> Ventas</span>
+            </div>
+            <div class="spinner"></div>
+            <div class="cargando">@AppResources.Cargando</div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="sinmargenes">
+
+        <VistaProductosHeader
+            TextoFiltro="@textoFiltro"
+            CantEnCart="@cantEnCart()"
+            TotalCarrito="@totalCarrito"
+            ClienteItem="@cliente"
+            TipoVendedor="@tipoVendedor"
+            ModoTestGps="false"
+            ListaDeProductosCargada="true"
+            OnTextoCambiado="SettextoFiltro"
+            OnAbrirCarrito="AbrirModalCarrito"
+            OnOpenCategorias="openCategorias" />
+
+        <div class="content_c_a1" style="padding-bottom: 70px;">
+            <div class="mt-3 px-2 px-md-3">
+
+                @if (_loadingCategorias)
+                {
+                    <div class="cat-grid">
+                        <div class="row g-2 m-0">
+                            @foreach (var _ in Enumerable.Range(0, 6))
+                            {
+                                <div class="col-6 p-1">
+                                    <div class="cat-card-skeleton placeholder-glow">
+                                        <div class="placeholder rounded-top" style="width:100%;aspect-ratio:1/1;display:block;"></div>
+                                        <div class="p-2 d-flex justify-content-center">
+                                            <div class="placeholder rounded-2" style="width:70%;height:16px;"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+                else if (lsCategorias is null || lsCategorias.Count == 0)
+                {
+                    <div class="text-muted small px-1">
+                        <i class="bi-info-circle me-1"></i> No hay categorías para mostrar.
+                    </div>
+                }
+                else
+                {
+                    <div class="cat-grid">
+                        <div class="row g-2 m-0">
+                            @foreach (var cat in lsCategorias)
+                            {
+                                <div class="col-6 p-1">
+                                    <button class="cat-card"
+                                            type="button"
+                                            aria-label="Abrir @cat.categoria"
+                                            @onclick="() => OnCategoriaSeleccionadaAsync(cat.categoriaID)">
+                                        <div class="cat-card-img-wrap">
+                                            <img src="/img/menuCategoria/@(NormalizarCat(cat.categoria)).png"
+                                                 class="cat-card-img"
+                                                 alt="@cat.categoria"
+                                                 loading="lazy"
+                                                 onerror="this.onerror=null;this.src='/img/categorias/placeholder.png';" />
+                                        </div>
+                                        <div class="cat-card-info">
+                                            <p class="cat-card-name">@cat.categoria</p>
+                                        </div>
+                                    </button>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+
+            </div>
+        </div>
+
+        <ModalCarrito
+            CartView="@cartview"
+            CartViewCombos="@cartviewCombos"
+            TotalCarrito="@totalCarrito"
+            TotalCarritoFinal="@totalCarritoFinal"
+            TotalCarritoNeto="@totalCarritoNeto"
+            ListaPercepcionesCalculadas="@listaPercepcionesCalculadas"
+            TipoVendedor="@tipoVendedor"
+            ListaaUsar="@listaaUsar"
+            DiasDisponibles="@diasDisponibles"
+            NombreBoton="@nombreBoton"
+            IsModalVisible="@isModalVisible"
+            Progress="@progress"
+            OnBorrarCart="(id) => BorrarCart(clienteID)"
+            OnBorrarProducto="(id) => BorrarProductodelCarrito(id, JS)"
+            OnBorrarCombo="(id) => BorrarCombodelCArritoxClienteID(null, id)"
+            OnActualizarCantidad="(t) => ActualizarCantidadCarrito(t.Item1, t.Item2, t.Item3, listaaUsar)"
+            OnActualizarDia="ActualizarDia"
+            OnTransmitir="(t) => Transmitir(t.Item1, t.Item2)"
+            OnAbrirProducto="AbrirModalProducto"
+            OnCloseModal="CloseModal" />
+
+        <ModalProductoDetalle
+            ProdInfoModal="@prodInfoModal"
+            ListaaUsar="@listaaUsar"
+            CantidadProductoModal="@cantidadProductoModal"
+            TipoVendedor="@tipoVendedor"
+            TipoVD="@oParam.tipoVD"
+            CFenCliente="@CFenClienteCata"
+            Cf="@cf"
+            BultoV2="@bulto"
+            ClienteMCE="@cliente.cli_MCE"
+            TextoVD="@textoVD"
+            Combos="@GetCombosDelProducto(prodInfoModal)"
+            OnCantidadChanged="ModificarCantidadProducto"
+            OnCambiarLista="CambiarLista"
+            OnChangeCF="(t) => ChangeCF(t.Item1, t.Item2)"
+            OnChangeBulto="(t) => ChangeBulto(t.Item1, t.Item2)"
+            OnAgregarCarrito="(p) => ActualizarCantidadCarrito(null, p, 0, listaaUsar)"
+            OnAbrirCombo="AbrirModalProducto" />
+
+        <div class="vp-bottom-nav">
+            <a class="vp-nav-item vp-nav-heart" @onclick="@(() => LoQmasMeGusta())">
+                <i class="bi-heart-fill"></i>
+                <span>Me gusta</span>
+            </a>
+            <a class="vp-nav-item vp-nav-fire" @onclick="@(() => LoMasPedido())">
+                <i class="bi-fire"></i>
+                <span>Más pedido</span>
+            </a>
+            <a class="vp-nav-item vp-nav-catalog active">
+                <i class="bi-grid-3x3-gap-fill"></i>
+                <span>Catálogo</span>
+            </a>
+            <a class="vp-nav-item vp-nav-new" @onclick="@(() => NuevosIngresos())">
+                <i class="bi-lightning-fill"></i>
+                <span>Nuevos</span>
+            </a>
+            <a href="@urlVendedor" class="vp-nav-item vp-nav-user">
+                <i class="bi-person-fill"></i>
+                <span>Mi cuenta</span>
+            </a>
+        </div>
+
+        <ModalComboDetalle
+            comboidActual="@comboid"
+            ComboHeadItem="@comboHeadItem"
+            LsProductosCC="@lsProductosCC"
+            LsProductosSC="@lsProductosSC"
+            CantidadDeCombo="@cantidadDeCombo"
+            MsgErrorCombo="@msgErrorCombo"
+            ListaaUsar="@listaaUsar"
+            TipoVendedor="@tipoVendedor"
+            TipoVD="@oParam.tipoVD"
+            CFenCliente="@CFenClienteCata"
+            Cf="@cf"
+            ClienteMCE="@cliente.cli_MCE"
+            OnCantidadCombos="(t) => CantidadDeCombos(t.Item1, t.Item2)"
+            OnActualizarCantidadCC="(t) => ActualizarCantidadCarritoCombos(t.Item1, t.Item2, t.Item3)"
+            OnCambiarLista="CambiarLista"
+            OnChangeCF="(t) => ChangeCF(t.Item1, t.Item2)"
+            OnCerrarCombo="CerrarCombo" />
+
+       @*  <section>
+            <div style="display:flex; justify-content:center; padding: 24px 0 8px;">
+                <img src="/img/logo.gif" height="80" width="80" style="opacity:0.5;" />
+            </div>
+        </section> *@
+
+    </div>
+}
+
+@code {
+
+    // ─── Estado de carga ──────────────────────────────────────────
+    private bool _inicializado = false;
+    private bool _loadingCategorias = false;
+
+    // ─── Listas de productos ──────────────────────────────────────
+    private List<ProductoListaItem> lsProductos = new List<ProductoListaItem>();
+    private List<ProductoListaItem> lsProductosBack = new List<ProductoListaItem>();
+    private List<ProductoListaItem> lsCombosProducto = new List<ProductoListaItem>();
+    private List<ProductoListaItem> lsProductosTT = new List<ProductoListaItem>();
+    private List<CombosXClientesItem> lsCombosXCliOrdenados = new List<CombosXClientesItem>();
+
+    private ProductoListaItems lsProductosItemsTT
+    {
+        get
+        {
+            ProductoListaItems lsDatos = new ProductoListaItems();
+            lsDatos.AddRange(lsProductosTT.ToList());
+            return lsDatos;
+        }
+    }
+
+    // ─── Carrito ──────────────────────────────────────────────────
+    public List<PedidosDetalleItem> cart = new List<PedidosDetalleItem>();
+    private List<ProductoListaItem> cartview = new List<ProductoListaItem>();
+    private List<ProductoListaItem> cartviewCombos = new List<ProductoListaItem>();
+    private decimal faltaArrastre = 0;
+    private decimal totalCarritoProductos = 0;
+    List<Percepciones> listaPercepcionesCalculadas = new List<Percepciones>();
+
+    // ─── Categorías ───────────────────────────────────────────────
+    private List<CategoriaItem> lsCategorias = new List<CategoriaItem>();
+    private List<SubCategoriasApiEcomItem> lsSubCategorias = new List<SubCategoriasApiEcomItem>();
+
+    // ─── Marcas ───────────────────────────────────────────────────
+    private List<string> lsMarcas = new List<string>();
+    string MarcaSeleccionada = "";
+    int ulitmaSubcatElegida = 0;
+
+    // ─── Modal progress bar ───────────────────────────────────────
+    private bool isModalVisible = false;
+    private int progress = 0;
+    private bool respPagoRecibido = false;
+
+    // ─── Combos ───────────────────────────────────────────────────
+    private List<ProductoListaItem> lsProductosCC = new List<ProductoListaItem>();
+    private List<ProductoListaItem> lsProductosSC = new List<ProductoListaItem>();
+    CombosHeadItem comboHeadItem = new CombosHeadItem();
+    PedidoCabeceraService oPedidoCabeceraService = new PedidoCabeceraService();
+    ProductosSubCategoriasService oProductosSubCategoriasService = new ProductosSubCategoriasService();
+    CombosxclienteService oCombosxclienteService = new CombosxclienteService();
+
+    // ─── Campos generales ─────────────────────────────────────────
+    private ClienteItem cliente = new ClienteItem();
+    ParametrosServices oParam = new ParametrosServices();
+
+    public List<DateTime> diasDisponibles = new List<DateTime> { DateTime.Now.AddDays(1) };
+    public DateTime? fechaSeleccionada;
+
+    int clienteID = 0;
+    int pedidoCabeceraId = 0;
+    int listaaUsar = 1;
+    string ListadePreciosNomre = "";
+    decimal totalCarrito = 0;
+    decimal totalCarritoNeto = 0;
+    decimal totalCarritoNetoPercep = 0;
+    decimal totalCarritoFinal = 0;
+
+    string textoFiltro = "";
+    public string textoFiltroAnterior = "";
+    int OrdenSeleccionado = 0;
+
+    ChangeEventArgs changeEventArgsDeleteCarrito = new ChangeEventArgs();
+    ProductoListaItem prodInfoModal = new ProductoListaItem();
+
+    string version;
+    int comboid;
+    int cantCC = 0;
+    int cantSC = 0;
+    int cantidadDeCombo = 1;
+    bool linecombo = true;
+    string msgErrorCombo = "";
+    string textoVD = "";
+    string urlVendedor = "/";
+
+    int Color = 0;
+    string vendedor = "";
+    int vendedorID;
+
+    bool mostrarSelect { get; set; } = true;
+    public string comentario = "";
+    bool bulto = false;
+    bool CFenClienteCata = false;
+    bool tipoVendedor = false;
+    public string nombreBoton = "Transmitir Pedido";
+    bool cf = true;
+
+    List<Migajas> migajas = new List<Migajas>();
+
+    // ─── Helpers ──────────────────────────────────────────────────
+
+    private static string NormalizarCat(string? s)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return "";
+        s = s.Trim().ToLowerInvariant();
+        var formD = s.Normalize(System.Text.NormalizationForm.FormD);
+        var sb = new System.Text.StringBuilder();
+        foreach (var ch in formD)
+        {
+            if (System.Globalization.CharUnicodeInfo.GetUnicodeCategory(ch) !=
+                System.Globalization.UnicodeCategory.NonSpacingMark)
+                sb.Append(ch);
+        }
+        return sb.ToString().Normalize(System.Text.NormalizationForm.FormC);
+    }
+
+    // ─── Combos del producto (para ModalProductoDetalle) ──────────
+    public List<CombosEnUnProductoItem> GetCombosDelProducto(ProductoListaItem productoListaItem)
+    {
+        return lsProductosItemsTT.GetProductoListaCombos(productoListaItem);
+    }
+
+    // ─── Ciclo de vida ────────────────────────────────────────────
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        try
+        {
+            await JS.InvokeAsync<string>("cargarCarousel");
+
+            if (firstRender)
+            {
+                oParam.PagePadre = "catalogoProductos";
+                try
+                {
+                    if (tipoVendedor)
+                        nombreBoton = "Realizar Pago";
+                }
+                catch { }
+            }
+        }
+        catch
+        {
+            await Task.Delay(3000);
+            await JS.InvokeAsync<string>("cargarCarousel");
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _loadingCategorias = true;
+        changeEventArgsDeleteCarrito.Value = 0;
+
+        tipoVendedor = oParam.TipoDeUsuario;
+
+        try
+        {
+            listaaUsar = (int)(oParam.ListadePrecios);
+            ListadePreciosNomre = oParam.listadePreciosNombre;
+            vendedor = oParam.Vendedor;
+            Color = Int32.Parse(oParam.Color);
+            vendedorID = Int32.Parse(oParam.VendedorID);
+            version = oParam.VersionApp;
+            textoVD = oParam.TextoVD;
+        }
+        catch
+        {
+            oParam.ListadePrecios = 1;
+            oParam.listadePreciosNombre = "Especial Distribucion";
+        }
+
+        diasDisponibles = ObtenerDiasDisponibles();
+
+        await JS.InvokeAsync<string>("ocultarnav");
+        clienteID = (int)(oParam.ClienteID);
+        pedidoCabeceraId = (int)(oParam.CabeceraCarritoID);
+
+        ClienteItemService oClienteItemService = new ClienteItemService();
+        cliente = await oClienteItemService.GetByID(clienteID);
+
+        CFenClienteCata = cliente.CUITValido == 0;
+
+        if (cliente.cli_MCE == 0)
+            cf = cliente.CUITValido == 0;
+
+        urlVendedor = "/";
+
+        lsProductosTT = await oProductoListaService.GetAll();
+
+        lsCombosXCliOrdenados = await oCombosxclienteService.GetCombosxClientexCliID(clienteID);
+        lsCombosXCliOrdenados = lsCombosXCliOrdenados.OrderBy(c => c.Orden).ToList();
+
+        await oCombosItemService.GetNombreCombo(0);
+        await GetCategorias();
+        _loadingCategorias = false;
+
+        Traer(0);
+
+        _inicializado = true;
+    }
+
+    // ─── Categorías ───────────────────────────────────────────────
+
+    private async Task<int> GetCategorias()
+    {
+        lsCategorias = await oProductoListaService.GetCatgorias(JS);
+        lsSubCategorias = await oProductoListaService.GetSubCatgorias(JS);
+        return 1;
+    }
+
+    private async Task OnCategoriaSeleccionadaAsync(int categoriaID)
+    {
+        _navigationManager.NavigateTo("/subCategorias/" + categoriaID);
+    }
+
+    private async Task abrirSubcagtegoria(MouseEventArgs e, int cat)
+    {
+        _navigationManager.NavigateTo("/subCategorias/" + cat);
+    }
+
+    private async Task openCategorias()
+    {
+        this.StateHasChanged();
+    }
+
+    // ─── Búsqueda ─────────────────────────────────────────────────
+
+    private void SettextoFiltro(string Value)
+    {
+        textoFiltro = Value;
+
+        bool esRetroceso = textoFiltro.Length < textoFiltroAnterior.Length;
+
+        if (textoFiltro.Length > 3 && !esRetroceso)
+        {
+            _navigationManager.NavigateTo("/vistaProductos/0/" + textoFiltro);
+            return;
+        }
+
+        textoFiltroAnterior = textoFiltro;
+    }
+
+    // ─── Carga de carrito ─────────────────────────────────────────
+
+    public async Task Traer(int subcat)
+    {
+        lsProductos = lsProductosBack;
+        lsCombosProducto = lsProductosTT.Where(c => c.ProductosID < 0).Take(20).ToList();
+
+        lsProductos = await oProductoListaService.LlenarCantidadEnCarrito(clienteID,
+            lsProductosTT.Where(c => c.TextoParaBusqueda.IndexOf(textoFiltro, StringComparison.InvariantCultureIgnoreCase) != -1 && c.ComboID == 0).ToList());
+
+        lsProductosBack = lsProductos;
+
+        lsMarcas = lsProductos
+            .GroupBy(p => p.Marca)
+            .Select(g => g.First().Marca)
+            .ToList();
+
+        cartview = await oProductoListaService.LlenarCantidadEnCarrito(clienteID, lsProductosTT);
+        cartviewCombos = await GenerarCarritoProductoCombos(clienteID);
+        var totalCarritoCombos = cartviewCombos.Sum(c => c.TotalLinea);
+        totalCarritoProductos = cartview.Sum(c => c.TotalLinea);
+        totalCarrito = totalCarritoProductos + totalCarritoCombos;
+
+        totalCarritoNeto = cartviewCombos.Sum(c => c.TotalLineaNeto);
+        totalCarritoNeto += cartview.Sum(c => c.TotalLineaNeto);
+
+        faltaArrastre = await oProductoListaService.EstadoArrastreParaCombos(cartview, cartviewCombos, clienteID);
+
+        this.StateHasChanged();
+    }
+
+    // ─── Modales ──────────────────────────────────────────────────
+
+    private async Task AbrirModalCarrito()
+    {
+        if (tipoVendedor)
+            ActualizarValorFinalCarrito();
+        else
+            totalCarritoFinal = totalCarrito;
+
+        await JS.InvokeVoidAsync("openCarritoModal");
+    }
+
+    private async Task AbrirModalProducto(int prodID)
+    {
+        if (prodID > 0)
+        {
+            prodInfoModal = lsProductosTT.Where(c => c.ProductosID == prodID).FirstOrDefault();
+            this.StateHasChanged();
+            await JS.InvokeVoidAsync("addtocartModal");
+        }
+        else
+        {
+            TraerCombo(-prodID);
+            await JS.InvokeVoidAsync("openmodalCombo");
+        }
+    }
+
+    // ─── Carrito – operaciones ────────────────────────────────────
+
+    private async Task ActualizarCantidadCarrito(ChangeEventArgs e, ProductoListaItem proIT, int cantincrementar, int listaPrecio)
+    {
+        int cantenbox = 0;
+        if (e != null)
+            cantenbox = Convert.ToInt32(e.Value);
+
+        proIT.ListaDePreciosUsada = (int)oParam.ListadePrecios;
+        if (proIT.CantidadEnCarrito == 0 && cantincrementar == 0 && !prodInfoModal.DesactivadoParaLaVenta && cantenbox < 1)
+            cantincrementar = 1;
+
+        if (proIT.UnidadesParaCompetarUnBulto > 1 && bulto)
+        {
+            cantincrementar = cantincrementar * proIT.UnidadesParaCompetarUnBulto;
+            decimal rr = proIT.CantidadEnCarrito / proIT.UnidadesParaCompetarUnBulto;
+            proIT.CantidadEnCarrito = (int)Math.Floor(rr) * proIT.UnidadesParaCompetarUnBulto;
+        }
+
+        await ActualizarCantidadCarrito_Shared(e, proIT, cantincrementar, JS, listaPrecio, cf);
+        cartview = await oProductoListaService.LlenarCantidadEnCarrito(clienteID, lsProductosTT);
+        faltaArrastre = await oProductoListaService.EstadoArrastreParaCombos(cartview, cartviewCombos, clienteID);
+
+        cartviewCombos = await GenerarCarritoProductoCombos(clienteID);
+        var totalCarritoCombos = cartviewCombos.Sum(c => c.TotalLinea);
+        totalCarritoProductos = cartview.Sum(c => c.TotalLinea);
+        totalCarrito = totalCarritoProductos + totalCarritoCombos;
+
+        if (tipoVendedor)
+        {
+            totalCarritoNeto = cartviewCombos.Sum(c => c.TotalLineaNeto);
+            totalCarritoNeto += cartview.Sum(c => c.TotalLineaNeto);
+            ActualizarValorFinalCarrito();
+        }
+        else
+        {
+            totalCarritoFinal = totalCarrito;
+        }
+
+        if (cartviewCombos.Count() == 0 && cartview.Count() == 0)
+        {
+            totalCarritoFinal = 0;
+            Traer(100002);
+            await JS.InvokeVoidAsync("cerrarModal");
+        }
+
+        this.StateHasChanged();
+    }
+
+    public async Task<int> BorrarProductodelCarrito(int proID, IJSRuntime JS)
+    {
+        PedidoCabeceraService oPedidoCabeceraService = new PedidoCabeceraService();
+        var cabecera = await oPedidoCabeceraService.GetByClienteIDsnTX(clienteID);
+        PedidosDetalleItemService oPedidosDetalleItemService = new PedidosDetalleItemService();
+        var lsProductoEnPEdido = await oPedidosDetalleItemService.GetByPedidoCabezaraID_ProdID(cabecera.PedidoCabeceraID, proID, 0, false);
+        await oPedidosDetalleItemService.Delete(lsProductoEnPEdido);
+
+        cartview = await oProductoListaService.LlenarCantidadEnCarrito(clienteID, lsProductosTT);
+        cartviewCombos = await GenerarCarritoProductoCombos(clienteID);
+        var totalCarritoCombos = cartviewCombos.Sum(c => c.TotalLinea);
+        totalCarritoProductos = cartview.Sum(c => c.TotalLinea);
+        totalCarrito = totalCarritoProductos + totalCarritoCombos;
+
+        if (tipoVendedor)
+        {
+            totalCarritoNeto = cartviewCombos.Sum(c => c.TotalLineaNeto);
+            totalCarritoNeto += cartview.Sum(c => c.TotalLineaNeto);
+            ActualizarValorFinalCarrito();
+        }
+        else
+        {
+            totalCarritoFinal = totalCarrito;
+        }
+
+        Traer(0);
+
+        if (cartviewCombos.Count() == 0 && cartview.Count() == 0)
+        {
+            totalCarritoFinal = 0;
+            Traer(100002);
+            await JS.InvokeVoidAsync("cerrarModal");
+        }
+
+        this.StateHasChanged();
+        return 0;
+    }
+
+    public async Task BorrarCart(int clienteid)
+    {
+        await BorrarPedidoSinTx(clienteid);
+        Traer(100003);
+        this.StateHasChanged();
+    }
+
+    private async Task BorrarCombodelCArritoxClienteID(MouseEventArgs r, int comboid)
+    {
+        await BorrarCombodelCArritoxClienteID_shared(clienteID, comboid, oParam.CabeceraCarritoID);
+
+        cartview = await oProductoListaService.LlenarCantidadEnCarrito(clienteID, lsProductosTT);
+        cartviewCombos = await GenerarCarritoProductoCombos(clienteID);
+        var totalCarritoCombos = cartviewCombos.Sum(c => c.TotalLinea);
+        totalCarritoProductos = cartview.Sum(c => c.TotalLinea);
+        totalCarrito = totalCarritoProductos + totalCarritoCombos;
+
+        if (tipoVendedor)
+        {
+            totalCarritoNeto = cartviewCombos.Sum(c => c.TotalLineaNeto);
+            totalCarritoNeto += cartview.Sum(c => c.TotalLineaNeto);
+            ActualizarValorFinalCarrito();
+        }
+        else
+        {
+            totalCarritoFinal = totalCarrito;
+        }
+
+        if (cartviewCombos.Count() == 0 && cartview.Count() == 0)
+        {
+            totalCarritoFinal = 0;
+            Traer(100002);
+            await JS.InvokeVoidAsync("cerrarModal");
+        }
+
+        Traer(0);
+        this.StateHasChanged();
+    }
+
+    public int cantEnCart()
+    {
+        return cartview.Count() + cartviewCombos.Count();
+    }
+
+    // ─── Transmisión de pedido ────────────────────────────────────
+
+    bool transmitiendo = false;
+
+    public async Task Transmitir(decimal totalCarrito, decimal totalNeto)
+    {
+        var oPedidoCabeceraService = new PedidoCabeceraService();
+        var head = await oPedidoCabeceraService.GetByClienteIDsnTX(clienteID);
+
+        head.TotalPedido = totalCarrito;
+        await oPedidoCabeceraService.UpdateTotalPedido(head.PedidoCabeceraID, totalCarrito);
+
+        if (head != null)
+        {
+            bool confirmarTransmision = await App.Current.MainPage.DisplayAlert("Confirmación", "¿Estás seguro de que deseas transmitir el pedido?", "Sí", "No");
+
+            if (confirmarTransmision && !transmitiendo)
+            {
+                transmitiendo = true;
+                await JS.InvokeVoidAsync("showLoader");
+
+                if (tipoVendedor)
+                {
+                    var montoMinimo = oParam.montoMinimo;
+                    bool confirmarMonto = true;
+
+                    if (head.TotalPedido < montoMinimo)
+                    {
+                        await App.Current.MainPage.DisplayAlert("Atención", "El minimo venta es " + montoMinimo + " $", "Aceptar");
+                        confirmarMonto = false;
+                    }
+
+                    (string PagoID, string StatusPago, string Mensaje, string PaymentID) respuestaPago = ("", "", "", "");
+
+                    if (confirmarMonto)
+                    {
+                        if (Parametros.ModoDemo)
+                        {
+                            await App.Current.MainPage.DisplayAlert("Modo demo", "Pago no disponible en modo demo", "Aceptar");
+                            return;
+                        }
+
+                        string KeyPagoID = head.ClienteID + "_" + head.VendedorID + "_" + DateTime.Now.ToString("yyyyMMddHHmmss");
+                        await oPedidoCabeceraService.UpdateKeyPagoID(head.PedidoCabeceraID, KeyPagoID);
+
+                        var mercadoPago = new Preference();
+                        try
+                        {
+                            mercadoPago = oParam.MP_Test != "1"
+                                ? await PagoService.PagoPreference((double)head.TotalPedido, KeyPagoID)
+                                : await PagoService.PagoPreference(1, KeyPagoID);
+                        }
+                        catch
+                        {
+                            mercadoPago = await PagoService.PagoPreference((double)head.TotalPedido, KeyPagoID);
+                        }
+
+                        await Launcher.OpenAsync(mercadoPago.InitPoint);
+                        var keyID = await oPedidoCabeceraService.ObtenerKeyPagoID(head.PedidoCabeceraID);
+
+                        isModalVisible = true;
+                        progress = 0;
+                        await InvokeAsync(StateHasChanged);
+
+                        _ = Task.Run(async () =>
+                        {
+                            respuestaPago = await PagoService.ConsultarPagoConIntervaloAsync(keyID);
+                            respPagoRecibido = true;
+                            progress = 100;
+                            await InvokeAsync(StateHasChanged);
+                        });
+
+                        var tiempoMaximo = TimeSpan.FromMinutes(5);
+                        var inicio = DateTime.Now;
+                        while (DateTime.Now - inicio < tiempoMaximo)
+                        {
+                            if (respPagoRecibido) break;
+                            progress = (int)((DateTime.Now - inicio).TotalSeconds / tiempoMaximo.TotalSeconds * 100);
+                            await InvokeAsync(StateHasChanged);
+                            await Task.Delay(1000);
+                        }
+
+                        isModalVisible = false;
+                        await InvokeAsync(StateHasChanged);
+
+                        string paymentID = "";
+                        if (respuestaPago.StatusPago == "approved")
+                        {
+                            try
+                            {
+                                if (respuestaPago.PaymentID != null)
+                                {
+                                    paymentID = respuestaPago.PaymentID;
+                                    await oPedidoCabeceraService.UpdatePaymentID(head.PedidoCabeceraID, paymentID);
+                                }
+                            }
+                            catch { }
+
+                            var res = await oPedidoCabeceraService.TransmitirPedido(head.PedidoCabeceraID, lsProductosItemsTT, comentario, head.TotalPedido, paymentID);
+
+                            if (res.StartsWith("Ok"))
+                                await App.Current.MainPage.DisplayAlert("Atención", respuestaPago.Mensaje + " tu pedido ha ingresado correctamente", "Aceptar");
+                            else
+                                await App.Current.MainPage.DisplayAlert("Atención", respuestaPago.Mensaje + " Tuvimos un problema con su pedido. Por favor, comuníquese con AppVendedores2025 Demo. PaymentMP: " + paymentID + " KeyID: " + keyID, "Aceptar");
+                        }
+                        else
+                        {
+                            await App.Current.MainPage.DisplayAlert("Atención", respuestaPago.Mensaje + " No se pudieron encontrar registros de tu pago. ¡Por favor, inténtalo nuevamente!", "Aceptar");
+                        }
+                    }
+
+                    await JS.InvokeVoidAsync("hideLoader");
+                    transmitiendo = false;
+                    respPagoRecibido = false;
+                    Traer(100002);
+                    await JS.InvokeVoidAsync("cerrarModal");
+                }
+                else
+                {
+                    var res = await oPedidoCabeceraService.TransmitirPedido(head.PedidoCabeceraID, lsProductosItemsTT, comentario, head.TotalPedido, "");
+
+                    if (res.StartsWith("Ok"))
+                        await App.Current.MainPage.DisplayAlert("Atención", "Tu pedido ha ingresado correctamente.", "OK");
+                    else
+                        await App.Current.MainPage.DisplayAlert("", res, "Aceptar");
+
+                    await JS.InvokeVoidAsync("hideLoader");
+                    transmitiendo = false;
+                    Traer(100002);
+                    await JS.InvokeVoidAsync("cerrarModal");
+                }
+            }
+        }
+    }
+
+    public void CloseModal()
+    {
+        isModalVisible = false;
+    }
+
+    // ─── Percepciones / total final ───────────────────────────────
+
+    public int ActualizarValorFinalCarrito()
+    {
+        if (totalCarritoNeto > 0)
+        {
+            var percepciones = oParam.ObtenerPercepciones();
+            listaPercepcionesCalculadas.Clear();
+            decimal porce = 0;
+
+            foreach (var itemPer in percepciones)
+            {
+                if (totalCarritoNeto >= itemPer.Monto)
+                {
+                    try
+                    {
+                        decimal calculoPorcetaje = (totalCarritoNeto * itemPer.Porcentaje) / 100;
+                        porce += calculoPorcetaje;
+
+                        listaPercepcionesCalculadas.Add(new Percepciones
+                        {
+                            descripcion = itemPer.Descripcion,
+                            montoCalculado = calculoPorcetaje,
+                            porcentaje = itemPer.Porcentaje
+                        });
+                    }
+                    catch { }
+                }
+            }
+
+            totalCarritoNetoPercep = porce;
+            totalCarritoFinal = totalCarrito + totalCarritoNetoPercep;
+        }
+        else
+        {
+            listaPercepcionesCalculadas.Clear();
+            totalCarritoNetoPercep = 0;
+            totalCarritoFinal = totalCarrito;
+        }
+
+        return 1;
+    }
+
+    // ─── Fecha de entrega ─────────────────────────────────────────
+
+    private List<DateTime> ObtenerDiasDisponibles()
+    {
+        DateTime inicio = DateTime.Now.TimeOfDay > new TimeSpan(18, 0, 0)
+            ? DateTime.Today.AddDays(2)
+            : DateTime.Today.AddDays(1);
+
+        return Enumerable.Range(0, 7)
+            .Select(offset => inicio.AddDays(offset))
+            .Where(dia => dia.DayOfWeek != DayOfWeek.Sunday)
+            .ToList();
+    }
+
+    private async Task ActualizarDia(ChangeEventArgs e)
+    {
+        var oPedidoCabeceraService = new PedidoCabeceraService();
+        var head = await oPedidoCabeceraService.GetByClienteIDsnTX(clienteID);
+        var diaSeleccionado = DateTime.Parse(e.Value.ToString());
+
+        head.FechaDeEntrega = diaSeleccionado;
+        fechaSeleccionada = head.FechaDeEntrega;
+
+        var resultado = await oPedidoCabeceraService.UpdateFechaEntrega(head);
+        if (resultado > 0)
+            diasDisponibles = ObtenerDiasDisponibles();
+    }
+
+    // ─── Modal producto ───────────────────────────────────────────
+
+    private int cantidadProductoModal
+    {
+        get
+        {
+            return bulto
+                ? prodInfoModal.CantidadEnCarrito * prodInfoModal.UnidadesParaCompetarUnBulto
+                : prodInfoModal.CantidadEnCarrito * prodInfoModal.UnidadesPorBulto;
+        }
+        set
+        {
+            prodInfoModal.CantidadEnCarrito = bulto
+                ? value / prodInfoModal.UnidadesParaCompetarUnBulto
+                : value / prodInfoModal.UnidadesPorBulto;
+        }
+    }
+
+    private async Task ModificarCantidadProducto(int cantidad)
+    {
+        if (prodInfoModal == null) return;
+
+        int unidades = bulto
+            ? prodInfoModal.UnidadesParaCompetarUnBulto * cantidad
+            : cantidad;
+
+        prodInfoModal.CantidadEnCarrito += unidades;
+        if (prodInfoModal.CantidadEnCarrito < 0)
+            prodInfoModal.CantidadEnCarrito = 0;
+
+        StateHasChanged();
+    }
+
+    private void CambiarLista(ChangeEventArgs e)
+    {
+        listaaUsar = SeleccionarLista(Int32.Parse(e.Value.ToString()));
+        this.StateHasChanged();
+    }
+
+    private async Task<bool> ChangeCF(ChangeEventArgs e, bool cfs)
+    {
+        cf = cfs;
+        if (cliente.cli_MCE == 0)
+            cf = cliente.CUITValido == 0;
+        return cf;
+    }
+
+    private async Task<bool> ChangeBulto(ChangeEventArgs e, bool b)
+    {
+        bulto = b;
+        this.StateHasChanged();
+        return bulto;
+    }
+
+    public string imagenExternaParaCombo(int comboID)
+    {
+        int comboiD = Math.Abs(comboID);
+        var prodIDdeCombo = oCombosItemService.ObtenerPrimerProdIDCombo(comboiD);
+        return prodIDdeCombo != null
+            ? "https://cdn.empresademo.example/CatalogoEcom/" + prodIDdeCombo + "_128.png"
+            : "";
+    }
+
+    // ─── Combos ───────────────────────────────────────────────────
+
+    private async Task TraerCombo(int comboid1)
+    {
+        comboid = comboid1;
+        lsProductosCC.Clear();
+        lsProductosSC.Clear();
+        ProductoListaService oProductoItemService = new ProductoListaService();
+        CombosItemService oCombosItemService = new CombosItemService();
+
+        var resHeader = await oCombosItemService.GetCombosHeadItem(comboid);
+        comboHeadItem = resHeader[0];
+        cantidadDeCombo = 1;
+
+        var lsProdCombo = await oCombosItemService.GetProductosByID(comboid);
+        await oProductoListaService.LlenarCantidadEnCarrito(clienteID, lsProductosTT.ToList());
+
+        cantCC = comboHeadItem.CantidadDinamica != 0 ? comboHeadItem.CantidadDinamica : comboHeadItem.Cantidad;
+        cantSC = comboHeadItem.CantSCargo;
+
+        foreach (var i in lsProdCombo)
+        {
+            var p = await oProductoItemService.GetByIdLista(i.ComboProductoID);
+
+            if (i.ComboTipo == 0)
+            {
+                p.PorcentajDescuento1 = Convert.ToDecimal(i.Descuento1);
+                p.PorcentajDescuento2 = Convert.ToDecimal(i.Descuento2);
+                p.NroDeGrupoCombo = i.NrGrupoDinamico;
+                p.CantidadMaximaPorGrupo = i.CantidadConCargo;
+                if (i.ProductoListaItem.StockEnUnidades > 1)
+                    lsProductosCC.Add(p);
+            }
+            else
+            {
+                p.PrecioUnitarioFinalAlamcene = 0;
+                p.PrecioUnitarioFinalAutoservicio = 0;
+                p.PrecioUnitarioFinalEspecial = 0;
+                p.PrecioUnitarioFinalKiosko = 0;
+                p.CantidadMaximaPorGrupo = i.CantidadConCargo;
+                if (i.NrGrupoDinamico == 1)
+                    p.NroDeGrupoCombo = i.NrGrupoDinamico;
+                if (i.ProductoListaItem.StockEnUnidades > 1)
+                    lsProductosSC.Add(p);
+            }
+        }
+
+        if (comboHeadItem.CantidadDinamica == 0)
+        {
+            foreach (var ccIt in lsProductosCC)
+                ccIt.CantidadEnCarrito = ccIt.CantidadMaximaPorGrupo * cantidadDeCombo;
+            foreach (var ccIt in lsProductosSC)
+                ccIt.CantidadEnCarrito = ccIt.CantidadMaximaPorGrupo * cantidadDeCombo;
+        }
+
+        foreach (var ccIt in lsProductosCC)
+        {
+            if (lsProductosCC.Where(c => c.NroDeGrupoCombo == ccIt.NroDeGrupoCombo).Count() == 1)
+            {
+                ccIt.CantidadEnCarrito = ccIt.CantidadMaximaPorGrupo * cantidadDeCombo;
+                ccIt.NombreDelCombo = "1";
+            }
+        }
+        foreach (var ccIt in lsProductosSC)
+        {
+            if (lsProductosSC.Where(c => c.NroDeGrupoCombo == ccIt.NroDeGrupoCombo).Count() == 1)
+            {
+                ccIt.CantidadEnCarrito = ccIt.CantidadMaximaPorGrupo * cantidadDeCombo;
+                ccIt.NombreDelCombo = "1";
+            }
+        }
+
+        this.StateHasChanged();
+    }
+
+    private bool estaProcesando = false;
+
+    private async Task CantidadDeCombos(ChangeEventArgs e, int cantincrementar)
+    {
+        if (estaProcesando) return;
+        estaProcesando = true;
+        try
+        {
+            int cantNueva;
+
+            if (e != null)
+            {
+                cantNueva = string.IsNullOrWhiteSpace(e.Value?.ToString()) ? 1
+                    : (int)Math.Floor(Convert.ToDouble(e.Value.ToString()));
+                if (cantNueva < 1) cantNueva = 1;
+            }
+            else
+            {
+                cantNueva = cantidadDeCombo + cantincrementar;
+                if (cantNueva < 1) cantNueva = 1;
+            }
+
+            if (cantNueva < cantidadDeCombo)
+            {
+                foreach (var item in lsProductosCC) item.CantidadEnCarrito = 0;
+                foreach (var item in lsProductosSC) item.CantidadEnCarrito = 0;
+            }
+
+            if (comboHeadItem.CantidadMaximaPorCliente != 0 && cantNueva > comboHeadItem.CantidadMaximaPorCliente)
+                cantNueva = comboHeadItem.CantidadMaximaPorCliente;
+            if (comboHeadItem.CantidadMaximaPorFactura != 0 && cantNueva > comboHeadItem.CantidadMaximaPorFactura)
+                cantNueva = comboHeadItem.CantidadMaximaPorFactura;
+
+            cantidadDeCombo = cantNueva;
+            StateHasChanged();
+        }
+        finally
+        {
+            estaProcesando = false;
+        }
+    }
+
+    private async Task ActualizarCantidadCarritoCombos(ChangeEventArgs e, ProductoListaItem proIT, int cantincrementar)
+    {
+        int cantNueva;
+
+        if (e != null)
+        {
+            cantNueva = string.IsNullOrWhiteSpace(e.Value?.ToString()) ? 0 : int.Parse(e.Value.ToString());
+            if (cantNueva < 0) cantNueva = 0;
+        }
+        else
+        {
+            cantNueva = proIT.CantidadEnCarrito + cantincrementar;
+            if (cantNueva < 0) cantNueva = 0;
+        }
+
+        proIT.CantidadEnCarrito = cantNueva;
+
+        if (comboHeadItem.CantidadDinamica != 0)
+        {
+            var cantDinamicaGrp = comboHeadItem.GetCantidadesGrupo;
+            var cantGrupoCarr = lsProductosCC.Where(c => c.NroDeGrupoCombo == proIT.NroDeGrupoCombo).Sum(c => c.CantidadEnCarrito);
+            var maxGrupo = cantDinamicaGrp[proIT.NroDeGrupoCombo] * cantidadDeCombo;
+            if (cantGrupoCarr > maxGrupo)
+                proIT.CantidadEnCarrito += maxGrupo - cantGrupoCarr;
+        }
+
+        var cantTotalCC = lsProductosCC.Where(c => c.ConCargo).Sum(c => c.CantidadEnCarrito);
+        if (cantTotalCC > cantCC * cantidadDeCombo)
+            proIT.CantidadEnCarrito += cantCC * cantidadDeCombo - cantTotalCC;
+
+        var cantTotalSC = lsProductosSC.Sum(c => c.CantidadEnCarrito);
+        if (cantTotalSC > comboHeadItem.CantSCargo * cantidadDeCombo)
+            proIT.CantidadEnCarrito += comboHeadItem.CantSCargo * cantidadDeCombo - cantTotalSC;
+
+        if (comboHeadItem.CantidadDinamica == 0)
+            proIT.CantidadEnCarrito = proIT.CantidadMaximaPorGrupo * cantidadDeCombo;
+
+        faltaArrastre = await oProductoListaService.EstadoArrastreParaCombos(cartview, cartviewCombos, clienteID);
+        CheckStatusCombo1();
+        StateHasChanged();
+    }
+
+    private bool CheckStatusCombo1()
+    {
+        msgErrorCombo = "";
+        bool comboOk = true;
+        var cantTotalSC = lsProductosSC.Sum(c => c.CantidadEnCarrito);
+        var cantTotalCC = lsProductosCC.Where(c => c.ConCargo).Sum(c => c.CantidadEnCarrito);
+
+        if (cantTotalCC != cantCC * cantidadDeCombo && comboHeadItem.CantidadDinamica != 0)
+        {
+            msgErrorCombo += ((cantCC * cantidadDeCombo) - cantTotalCC) + " Con cargo \n ";
+            comboOk = false;
+        }
+        if (cantTotalSC != comboHeadItem.CantSCargo * cantidadDeCombo)
+        {
+            msgErrorCombo += ((comboHeadItem.CantSCargo * cantidadDeCombo) - cantTotalSC) + " Sin cargo";
+            comboOk = false;
+        }
+
+        return comboOk;
+    }
+
+    private async Task CerrarCombo()
+    {
+        var statusCombo = CheckStatusCombo1();
+        ClienteItemService oclienteItemService = new ClienteItemService();
+        var cliDatos = await oclienteItemService.GetByID(clienteID);
+
+        if (statusCombo)
+        {
+            await oPedidoCabeceraService.BorrarByClienteIdyComboIDSinTx(clienteID, comboid);
+
+            int lsprcios = 1;
+
+            foreach (var it in lsProductosCC)
+            {
+                if (it.CantidadEnCarrito > 0)
+                {
+                    decimal valorFinalCombo;
+                    if (it.PorcentajDescuento1 > 0 || it.PorcentajDescuento2 > 0)
+                    {
+                        decimal precioLista = it.PrecioUnitarioFinal(listaaUsar);
+                        decimal d1 = it.PorcentajDescuento1 > 0 ? precioLista - (precioLista * it.PorcentajDescuento1 / 100) : 0;
+                        decimal d2 = it.PorcentajDescuento2 > 0 ? precioLista - (precioLista * it.PorcentajDescuento2 / 100) : 0;
+                        valorFinalCombo = d1 + d2;
+                    }
+                    else
+                    {
+                        valorFinalCombo = it.PrecioUnitarioFinal(listaaUsar);
+                    }
+
+                    await oPedidoCabeceraService.AgregarPedidosCombo(clienteID, it.ProductosID, it.CantidadEnCarrito, listaaUsar, comboid, valorFinalCombo, it.PrecioUnitarioNeto(listaaUsar), it.NroDeGrupoCombo, cliDatos.cli_codigo, cliDatos.cli_direccion, it.Nombre, it.CodigoDeProducto, cf, it.UnidadesPorBulto, cantidadDeCombo, vendedorID, version, it.ComboCodigo);
+                }
+            }
+
+            foreach (var it in lsProductosSC)
+            {
+                if (it.CantidadEnCarrito > 0)
+                    await oPedidoCabeceraService.AgregarPedidosCombo(clienteID, it.ProductosID, it.CantidadEnCarrito, lsprcios, comboid, 0, 0, it.NroDeGrupoCombo, cliDatos.cli_codigo, cliDatos.cli_direccion, it.Nombre, it.CodigoDeProducto, cf, it.UnidadesPorBulto, cantidadDeCombo, vendedorID, version, it.ComboCodigo);
+            }
+
+            await App.Current.MainPage.DisplayAlert("Atencion", "Se guardo el combo", "OK");
+            _navigationManager.NavigateTo("/vistaProductos/" + 100002, true);
+        }
+        else
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine("Falta cargar:");
+            sb.AppendLine(msgErrorCombo);
+            await App.Current.MainPage.DisplayAlert("Atencion", sb.ToString(), "OK");
+        }
+    }
+
+    private string CambiarColorCombos()
+    {
+        linecombo = !linecombo;
+        return linecombo ? "#b7cd78" : "#f4d392";
+    }
+
+    public string ClassPrecio(ProductoListaItem it, int tipo)
+    {
+        bool tachar = false;
+        bool mostrardesc = false;
+
+        if (it.PrecioNoCalculado != "N/Calc")
+        {
+            decimal p1 = 0;
+            if (!string.IsNullOrEmpty(it.TextoCombo(listaaUsar)))
+                decimal.TryParse(it.TextoCombo(listaaUsar), out p1);
+
+            if (Math.Abs(p1 - it.PrecioUnitarioFinal(listaaUsar)) >= 0.30M && p1 != 0)
+            {
+                tachar = true;
+                mostrardesc = true;
+            }
+        }
+
+        if (tipo == 1)
+            return tachar ? "text-decoration: line-through #f81404 4px;" : "";
+        else
+            return mostrardesc ? "" : "display:none;";
+    }
+
+    // ─── Filtros de navegación ────────────────────────────────────
+
+    private async Task LoQmasMeGusta()
+    {
+        _navigationManager.NavigateTo("/vistaProductos/" + 100002);
+    }
+
+    private async Task LoMasPedido()
+    {
+        _navigationManager.NavigateTo("/vistaProductos/" + 100003);
+    }
+
+    private async Task NuevosIngresos()
+    {
+        _navigationManager.NavigateTo("/vistaProductos/" + 100004);
+    }
+
+    private void ActualizarComentario(ChangeEventArgs e)
+    {
+        comentario = e.Value.ToString();
+    }
+}

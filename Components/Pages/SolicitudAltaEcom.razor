@@ -1,0 +1,726 @@
+@page "/SolicitudAltaEcom"
+@implements IDisposable
+@using System.Net.Http.Json
+@using System.Text.Json
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+@inject NavigationManager NavigationManager
+
+<!-- Fuentes y Librerías -->
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+
+<div class="form-page login-wrapper">
+    <div class="form-card animate-fade-up">
+        <header class="header-section" style="position: relative; display: flex; align-items: center; justify-content: center; margin-bottom: 30px;">
+            <a href="/" class="back-button" title="Volver al inicio">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M15 18l-6-6 6-6"/>
+                </svg>
+            </a>
+            <h3 style="margin: 0; font-size: 28px; font-weight: 700; color: #1e293b;">Nuevo Registro</h3>
+        </header>
+        <p style="text-align: center; color: #64748b; font-size: 14px; margin-top: -20px; margin-bottom: 30px;">Seleccioná tu tipo de usuario para empezar.</p>
+
+        <EditForm Model="registroModel" OnSubmit="ProcesarRegistro" @onkeydown="@(e => { if (e.Key == "Enter") return; })">
+            
+            <div class="field-group">
+                <label>Tipo de Usuario</label>
+                <div class="sa-input-wrap">
+                    <select value="@registroModel.TipoUsuario" @onchange="OnTipoUsuarioChanged" class="modern-input modern-select" required>
+                        <option value="0" disabled selected>-- Elegí una opción --</option>
+                        <option value="1">Consumidor Final</option>
+                        <option value="2">Comercio</option>
+                    </select>
+                </div>
+            </div>
+
+            @if (mostrarCampos)
+            {
+                <div class="animate-fade-up" style="position: relative;">
+
+                    @if (isConsultandoAfip)
+                    {
+                        <div style="position: absolute; inset: 0; background: rgba(255,255,255,0.75); z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 12px; gap: 12px;">
+                            <div style="width: 36px; height: 36px; border: 4px solid #e2e8f0; border-top-color: #2563eb; border-radius: 50%; animation: spin 0.7s linear infinite;"></div>
+                            <span style="color: #2563eb; font-size: 14px; font-weight: 600;">Consultando AFIP...</span>
+                        </div>
+                    }
+
+                    <div class="field-group">
+                        <label>@(registroModel.TipoUsuario >= 2 ? "CUIT" : "DNI")</label>
+                        <InputText type="number" @bind-Value="registroModel.DNI" class="modern-input" placeholder="@(registroModel.TipoUsuario >= 2 ? "CUIT de la empresa" : "DNI del titular")" maxlength="11" oninput="this.value = this.value.replace(/[^0-9]/g, '')" @onblur="OnDniBlur" required />
+                    </div>
+
+                    <div class="field-group">
+                        <label>Email</label>
+                        <div class="sa-input-wrap">
+                            <InputText type="email" @bind-Value="registroModel.Email" class="modern-input" placeholder="ejemplo@correo.com" required />
+                        </div>
+                    </div>
+
+                    @if (registroModel.TipoUsuario == 2)
+                    {
+                        <div class="field-group animate-fade-up">
+                            <label>Razón Social</label>
+                            <InputText @bind-Value="registroModel.Nombre" class="modern-input" placeholder="Nombre de la empresa" disabled="@true" required />
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="field-group animate-fade-up">
+                            <label>Nombre completo</label>
+                            <InputText @bind-Value="registroModel.Nombre" class="modern-input" placeholder="Tu nombre completo" disabled="@true" required />
+                        </div>
+                    }
+
+                    <div class="field-group">
+                        <label>Teléfono</label>
+                        <InputText type="number" id="telefono" @bind-Value="registroModel.Telefono" class="modern-input" placeholder="Ej: 1144443333" oninput="this.value = this.value.replace(/[^0-9]/g, '')" @onblur="OnTelefonoBlur" required />
+                    </div>
+
+                    <!-- Provincia -->
+                    <div class="field-group">
+                        <label>Provincia</label>
+                        <div class="sa-input-wrap">
+                            <select value="@registroModel.ProvinciaId"
+                                    @onchange="OnProvinciaChanged"
+                                    class="modern-input modern-select @(isLoadingProvincias ? "select-loading" : "")"
+                                    disabled="@isLoadingProvincias"
+                                    required>
+                                <option value="0">
+                                    @(isLoadingProvincias ? "Cargando provincias..." : "-- Seleccioná una provincia --")
+                                </option>
+                                @foreach (var prov in provincias)
+                                {
+                                    <option value="@prov.ProvinciasID">@prov.Nombre</option>
+                                }
+                            </select>
+                        </div>
+                        @if (!string.IsNullOrEmpty(errorProvincias))
+                        {
+                            <small style="color: #ef4444; margin-left: 4px;">@errorProvincias</small>
+                        }
+                    </div>
+
+                    <!-- Localidad -->
+                    <div class="field-group">
+                        <label>Localidad</label>
+                        <div class="sa-input-wrap">
+                            <select value="@registroModel.LocalidadId"
+                                    @onchange="OnLocalidadChanged"
+                                    class="modern-input modern-select @(isLoadingLocalidades ? "select-loading" : "")"
+                                    disabled="@(registroModel.ProvinciaId == 0 || isLoadingLocalidades)"
+                                    required>
+                                <option value="0">
+                                    @if (registroModel.ProvinciaId == 0)
+                                    {
+                                        <text>-- Primero seleccioná una provincia --</text>
+                                    }
+                                    else if (isLoadingLocalidades)
+                                    {
+                                        <text>Cargando localidades...</text>
+                                    }
+                                    else
+                                    {
+                                        <text>-- Seleccioná una localidad --</text>
+                                    }
+                                </option>
+                                @foreach (var loc in localidades)
+                                {
+                                    <option value="@loc.LocalidadesID">@loc.Nombre</option>
+                                }
+                            </select>
+                        </div>
+                        @if (!string.IsNullOrEmpty(errorLocalidades))
+                        {
+                            <small style="color: #ef4444; margin-left: 4px;">@errorLocalidades</small>
+                        }
+                    </div>
+
+                    <div class="field-group">
+                        <label>Dirección de Envío</label>
+                        <InputText id="reg_shipping_address_input" @bind-Value="registroModel.DireccionEnvio" class="modern-input" placeholder="Buscá tu dirección..." required />
+                        <div class="map-container">
+                            <div id="reg_shipping_address_map" style="width: 100%; height: 200px; background: #f1f5f9;"></div>
+                        </div>
+                    </div>
+
+                    <div class="field-group">
+                        <label>Altura / Número</label>
+                        <InputText @bind-Value="registroModel.Altura" class="modern-input" placeholder="Ej: 1234" maxlength="10" required />
+                    </div>
+
+                    <div class="field-group">
+                        <label>Código Postal</label>
+                        <InputText @bind-Value="registroModel.CodigoPostal" class="modern-input" placeholder="Ej: 1405" maxlength="10" required />
+                    </div>
+
+                    <div class="field-group">
+                        <label>Contraseña</label>
+                        <InputText type="password" @bind-Value="registroModel.Password" class="modern-input" placeholder="Mínimo 4 caracteres" autocomplete="new-password" required />
+                    </div>
+
+                 @*    @if (registroModel.TipoUsuario == 1)
+                    {
+                        <div class="field-group animate-fade-up">
+                            <label>Referido Por (Opcional)</label>
+                            <InputText @bind-Value="registroModel.Referido" class="modern-input" placeholder="Nombre de quien te recomendó" />
+                        </div>
+                    } *@
+
+                    <button type="submit" class="btn-submit" disabled="@(isSubmitting || isConsultandoAfip || isErrorDni || isErrorTelefono)">
+                        @if (isSubmitting)
+                        {
+                            <span style="margin-right: 8px;">Procesando...</span>
+                        }
+                        else
+                        {
+                            <span>Registrarse</span>
+                        }
+                    </button>
+                </div>
+            }
+        </EditForm>
+
+       @*  <div style="text-align: center;">
+            <a href="/" class="btn-back">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                Volver al inicio
+            </a>
+        </div> *@
+    </div>
+</div>
+
+@code {
+    private RegistroUsuarioModel registroModel = new RegistroUsuarioModel();
+    private bool mostrarCampos = false;
+    private bool isSubmitting = false;
+    private bool isConsultandoAfip = false;
+    private bool isErrorDni = false;
+    private bool isErrorTelefono = false;
+    private bool isRazonSocialDisabled = false;
+    private bool isDireccionFromMaps = false;
+    private DotNetObjectReference<SolicitudAltaEcom>? objRef;
+
+    // Provincias y Localidades
+    private List<ProvinciaItem> provincias = new();
+    private List<LocalidadItem> localidades = new();
+    private bool isLoadingProvincias = false;
+    private bool isLoadingLocalidades = false;
+    private string errorProvincias = "";
+    private string errorLocalidades = "";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && mostrarCampos)
+        {
+            await InitMap();
+        }
+    }
+
+    private async Task InitMap()
+    {
+        if (objRef == null)
+            objRef = DotNetObjectReference.Create(this);
+            
+        await JS.InvokeVoidAsync("initAltaGoogleMaps", objRef, "reg_shipping_address_input", "reg_shipping_address_map");
+    }
+
+    private async Task OnTipoUsuarioChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int val) && val > 0)
+        {
+            // Resetear el modelo conservando el nuevo tipo seleccionado
+            registroModel = new RegistroUsuarioModel { TipoUsuario = val };
+            
+            // Resetear estados de validación y UI
+            isErrorDni = false;
+            isErrorTelefono = false;
+            isDireccionFromMaps = false;
+            localidades = new List<LocalidadItem>();
+            errorLocalidades = "";
+
+            mostrarCampos = true;
+            isRazonSocialDisabled = true; // siempre empieza deshabilitado hasta que AFIP responda
+            StateHasChanged();
+            
+            // Inicializar mapa
+            await Task.Delay(100);
+            await InitMap();
+
+            // Cargar provincias si aun no están cargadas
+            if (provincias.Count == 0)
+            {
+                await CargarProvincias();
+            }
+        }
+    }
+
+    private async Task CargarProvincias()
+    {
+        isLoadingProvincias = true;
+        errorProvincias = "";
+        StateHasChanged();
+
+        try
+        {
+            ParametrosServices oParam = new ParametrosServices();
+            string baseUrl = oParam.urlApi;
+
+            using var apiClient = new HttpClient();
+            var result = await apiClient.GetFromJsonAsync<List<ProvinciaItem>>($"{baseUrl}Ubicaciones/Provincias");
+            provincias = result ?? new List<ProvinciaItem>();
+        }
+        catch (Exception ex)
+        {
+            errorProvincias = "No se pudieron cargar las provincias. Intente nuevamente.";
+            provincias = new List<ProvinciaItem>();
+            _ = ex; // supress warning
+        }
+        finally
+        {
+            isLoadingProvincias = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnProvinciaChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int provinciaId))
+        {
+            registroModel.ProvinciaId = provinciaId;
+            registroModel.ProvinciaNombre = provincias.FirstOrDefault(p => p.ProvinciasID == provinciaId)?.Nombre ?? "";
+
+            // Resetear localidad seleccionada
+            registroModel.LocalidadId = 0;
+            registroModel.LocalidadNombre = "";
+            localidades = new List<LocalidadItem>();
+            errorLocalidades = "";
+
+            if (provinciaId > 0)
+            {
+                await CargarLocalidades(provinciaId);
+            }
+            else
+            {
+                StateHasChanged();
+            }
+        }
+    }
+
+    private async Task CargarLocalidades(int provinciaId)
+    {
+        isLoadingLocalidades = true;
+        errorLocalidades = "";
+        StateHasChanged();
+
+        try
+        {
+            ParametrosServices oParam = new ParametrosServices();
+            string baseUrl = oParam.urlApi;
+
+            using var apiClient = new HttpClient();
+            var result = await apiClient.GetFromJsonAsync<List<LocalidadItem>>($"{baseUrl}Ubicaciones/Localidades/{provinciaId}");
+            localidades = result ?? new List<LocalidadItem>();
+        }
+        catch (Exception ex)
+        {
+            errorLocalidades = "No se pudieron cargar las localidades. Intente nuevamente.";
+            localidades = new List<LocalidadItem>();
+            _ = ex;
+        }
+        finally
+        {
+            isLoadingLocalidades = false;
+            StateHasChanged();
+        }
+    }
+
+    private void OnLocalidadChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int localidadId))
+        {
+            registroModel.LocalidadId = localidadId;
+            registroModel.LocalidadNombre = localidades.FirstOrDefault(l => l.LocalidadesID == localidadId)?.Nombre ?? "";
+        }
+    }
+
+    private async Task OnDniBlur()
+    {
+        var dni = registroModel.DNI;
+        if (string.IsNullOrWhiteSpace(dni) || !long.TryParse(dni, out _) || dni.Length < 7 || dni.Length > 11)
+        {
+            await JS.InvokeVoidAsync("Swal.fire", "Atención", "DNI o CUIT inválido. Debe tener entre 7 y 11 dígitos.", "warning");
+            isErrorDni = true;
+            isRazonSocialDisabled = false;
+        }
+        else
+        {
+            isErrorDni = false;
+
+            await ConsultarPersonaAfip(dni, esCuit: registroModel.TipoUsuario == 2);
+        }
+    }
+
+    private static readonly JsonSerializerOptions _jsonOpts =
+        new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+    private async Task ConsultarPersonaAfip(string valor, bool esCuit)
+    {
+        isRazonSocialDisabled = false;
+        isConsultandoAfip = true;
+        StateHasChanged();
+
+        try
+        {
+            ParametrosServices oParam = new ParametrosServices();
+            string baseUrl = oParam.urlApi;
+
+            var ruta = esCuit
+                ? $"{baseUrl}AfipValidacion/GetPersonaCuit/{valor}"
+                : $"{baseUrl}AfipValidacion/GetPersonaDni/{valor}";
+
+            using var apiClient = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+            var response = await apiClient.GetAsync(ruta);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                if (!string.IsNullOrWhiteSpace(json) && json != "null")
+                {
+                    var persona = JsonSerializer.Deserialize<AfipPersonaDto>(json, _jsonOpts);
+                    if (persona != null)
+                    {
+                        AplicarDatosPersona(persona, esCuit);
+                        isRazonSocialDisabled = true;
+                    }
+                }
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                var mensaje = esCuit
+                    ? "No se encontraron datos en AFIP para el CUIT ingresado. Verificá que el CUIT sea correcto e intentá nuevamente."
+                    : "No se encontraron datos en AFIP para el DNI ingresado. Si sos cliente final, intentá con tu DNI sin puntos ni espacios.";
+                await JS.InvokeVoidAsync("Swal.fire", "No encontrado en AFIP", mensaje, "warning");
+            }
+        }
+        catch (TaskCanceledException)
+        {
+            await JS.InvokeVoidAsync("Swal.fire", "Tiempo de espera",
+                "La consulta a AFIP tardó demasiado. Podés completar los datos manualmente.", "warning");
+        }
+        catch (Exception)
+        {
+            // Error inesperado: no bloqueamos el formulario
+        }
+        finally
+        {
+            isConsultandoAfip = false;
+            StateHasChanged();
+        }
+    }
+
+    private void AplicarDatosPersona(AfipPersonaDto persona, bool esCuit)
+    {
+        if (esCuit)
+        {
+            // Para comercio: RazonSocial va al campo Nombre
+            registroModel.Nombre = !string.IsNullOrWhiteSpace(persona.RazonSocial)
+                ? persona.RazonSocial
+                : $"{persona.Apellido} {persona.Nombre}".Trim();
+        }
+        else
+        {
+            // Para persona física: nombre completo en un solo campo
+            if (!string.IsNullOrWhiteSpace(persona.RazonSocial))
+            {
+                registroModel.Nombre = persona.RazonSocial.Trim();
+            }
+            else
+            {
+                registroModel.Nombre = $"{persona.Apellido} {persona.Nombre}".Trim();
+            }
+            registroModel.Apellido = "";
+        }
+    }
+
+    private async Task OnTelefonoBlur()
+    {
+        var nrtel = registroModel.Telefono;
+        if (string.IsNullOrWhiteSpace(nrtel) || !long.TryParse(nrtel, out _) || nrtel.Length != 10)
+        {
+            await JS.InvokeVoidAsync("Swal.fire", "Teléfono incorrecto", "Ingrese su nro de celular para recibir el seguimiento de su compra. Código de área+número de teléfono, sin 0 ni 15. Ej 1144443333", "error");
+            isErrorTelefono = true;
+        }
+        else
+        {
+            isErrorTelefono = false;
+            try
+            {
+                // Simulación de envío de WhatsApp (según lógica heredada)
+                //await JS.InvokeVoidAsync("Swal.fire", "WhatsApp Enviado", $"Te enviamos un mensaje al {nrtel} para confirmar el seguimiento de tus pedidos.", "success");
+            }
+            catch (Exception)
+            {
+            }
+        }
+    }
+
+    [JSInvokable]
+    public void SetCoordenadasDireccion(string lat, string lng, string address)
+    {
+        registroModel.Latitud = lat;
+        registroModel.Longitud = lng;
+        registroModel.DireccionEnvio = address;
+        isDireccionFromMaps = true;
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void SetCoordenadasDireccionConPostal(string lat, string lng, string address, string codigoPostal)
+    {
+        registroModel.Latitud = lat;
+        registroModel.Longitud = lng;
+        registroModel.DireccionEnvio = address;
+        registroModel.CodigoPostal = codigoPostal;
+        isDireccionFromMaps = true;
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        objRef?.Dispose();
+    }
+
+    // ─── Modelos de datos ────────────────────────────────────────────────────
+
+    public class RegistroUsuarioModel
+    {
+        public int TipoUsuario { get; set; } = 0;
+        public string Email { get; set; } = "";
+        public string Nombre { get; set; } = "";
+        public string Apellido { get; set; } = "";
+        public string DNI { get; set; } = "";
+        public string Telefono { get; set; } = "";
+        public string DireccionEnvio { get; set; } = "";
+        public string CodigoPostal { get; set; } = "";
+        public string Latitud { get; set; } = "0";
+        public string Longitud { get; set; } = "0";
+        public string Password { get; set; } = "";
+        // Provincia
+        public int ProvinciaId { get; set; } = 0;
+        public string ProvinciaNombre { get; set; } = "";
+        // Localidad
+        public int LocalidadId { get; set; } = 0;
+        public string LocalidadNombre { get; set; } = "";
+        // public string Referido { get; set; } = "";    
+        public string Altura { get; set; } = "";
+
+    }
+
+    public class ProvinciaItem
+    {
+        public int ProvinciasID { get; set; }
+        public string Nombre { get; set; } = "";
+    }
+
+    public class LocalidadItem
+    {
+        public int LocalidadesID { get; set; }
+        public string Nombre { get; set; } = "";
+    }
+
+    // ─── DTOs respuesta AFIP ──────────────────────────────────────────────────
+
+    public class AfipPersonaDto
+    {
+        public string? Cuit { get; set; }
+        public string? RazonSocial { get; set; }
+        public string? Estado { get; set; }
+        public string? Direccion { get; set; }
+        public string? Apellido { get; set; }
+        public string? Nombre { get; set; }
+        public string? TipoPersona { get; set; }
+        public string? TipoDocumento { get; set; }
+        public string? NumeroDocumento { get; set; }
+        public string? TipoClave { get; set; }
+        public string? EstadoClave { get; set; }
+        public string? FechaNacimiento { get; set; }
+        public string? IdPersona { get; set; }
+        public string? IdActividadPrincipal { get; set; }
+        public string? DescripcionActividadPrincipal { get; set; }
+        public List<AfipDomicilioDto>? Domicilios { get; set; }
+    }
+
+    public class AfipDomicilioDto
+    {
+        public string? Calle { get; set; }
+        public string? Numero { get; set; }
+        public string? Localidad { get; set; }
+        public string? CodigoPostal { get; set; }
+        public string? DescripcionProvincia { get; set; }
+        public string? Direccion { get; set; }
+        public string? EstadoDomicilio { get; set; }
+        public string? IdProvincia { get; set; }
+        public string? TipoDomicilio { get; set; }
+    }
+
+    // ─── Registro ────────────────────────────────────────────────────────────
+
+    private async Task ProcesarRegistro()
+    {
+        await OnDniBlur();
+        await OnTelefonoBlur();
+
+        if (isErrorDni || isErrorTelefono)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(registroModel.Email) || !registroModel.Email.Contains('@'))
+        {
+            await JS.InvokeVoidAsync("Swal.fire", "Email requerido", "Por favor ingresá un email válido.", "warning");
+            return;
+        }
+
+        if (registroModel.Password.Length < 4)
+        {
+            await JS.InvokeVoidAsync("Swal.fire", "Contraseña corta", "La contraseña debe tener al menos 4 caracteres.", "warning");
+            return;
+        }
+
+        // Validar provincia y localidad
+        if (registroModel.ProvinciaId == 0)
+        {
+            await JS.InvokeVoidAsync("Swal.fire", "Provincia requerida", "Por favor seleccioná una provincia.", "warning");
+            return;
+        }
+
+        if (registroModel.LocalidadId == 0)
+        {
+            await JS.InvokeVoidAsync("Swal.fire", "Localidad requerida", "Por favor seleccioná una localidad.", "warning");
+            return;
+        }
+
+        // Validar que el nombre/razón social no esté vacío
+        if (string.IsNullOrWhiteSpace(registroModel.Nombre))
+        {
+            var campoNombre = registroModel.TipoUsuario == 2 ? "Razón Social" : "Nombre";
+            await JS.InvokeVoidAsync("Swal.fire", $"{campoNombre} requerido",
+                $"Por favor ingresá el {campoNombre.ToLower()}.", "warning");
+            return;
+        }
+
+        // Validar que la dirección fue seleccionada desde Google Maps y no solo escrita
+        if (!isDireccionFromMaps || string.IsNullOrWhiteSpace(registroModel.DireccionEnvio))
+        {
+            await JS.InvokeVoidAsync("Swal.fire", "Dirección inválida",
+                "Por favor buscá y seleccioná tu dirección usando el buscador del mapa. No escribas la dirección manualmente.",
+                "warning");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(registroModel.Altura))
+        {
+            await JS.InvokeVoidAsync("Swal.fire", "Altura requerida", "Por favor ingresá la altura o número de tu domicilio.", "warning");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(registroModel.CodigoPostal))
+        {
+            await JS.InvokeVoidAsync("Swal.fire", "Código Postal requerido", "Por favor ingresá el código postal.", "warning");
+            return;
+        }
+
+        isSubmitting = true;
+        StateHasChanged();
+
+        try
+        {
+            ParametrosServices oParam = new ParametrosServices();
+            string baseUrl = oParam.urlApi;
+            
+            // Si es Empresa, el Apellido debe ir vacío
+            if (registroModel.TipoUsuario == 2)
+            {
+                registroModel.Apellido = "";
+            }
+
+            string nombreCompleto = string.IsNullOrWhiteSpace(registroModel.Apellido) 
+                ? registroModel.Nombre 
+                : $"{registroModel.Nombre} {registroModel.Apellido}".Trim();
+
+            var postData = new
+            {
+                TipoUsuario = registroModel.TipoUsuario,
+                Email = registroModel.Email,
+                Password = registroModel.Password,
+                Nombre = nombreCompleto,
+                DNI = registroModel.DNI,
+                DireccionEnvio = registroModel.DireccionEnvio,
+                DireccionEnvio_CodigoPostal = registroModel.CodigoPostal,
+                DireccionEnvio_Latitud = registroModel.Latitud,
+                DireccionEnvio_Longitud = registroModel.Longitud,
+                Provincia = registroModel.ProvinciaNombre,
+                Localidad = registroModel.LocalidadNombre,
+                localidadSeleccionadaId = registroModel.LocalidadId,
+                Telefono = registroModel.Telefono,
+                Altura = registroModel.Altura 
+            };
+
+            using (var apiClient = new HttpClient())
+            {
+                var content = JsonContent.Create(postData);
+                var response = await apiClient.PostAsync($"{baseUrl}ClienteItem/AltaClienteAPP", content);
+                var resultText = await response.Content.ReadAsStringAsync();
+                var textoRespuesta = resultText.Trim('"'); // quitar comillas del JSON string
+
+                // La API devuelve 200 tanto cuando ya existia el cliente como cuando envio el WA.
+                // Distinguimos el caso "ya existe" por el texto del resultado.
+                if (response.IsSuccessStatusCode)
+                {
+
+                    if (textoRespuesta.Contains("ya existe"))
+                    {
+                        // El cliente ya estaba regis   trado
+                        await JS.InvokeVoidAsync("Swal.fire", "Atención",
+                            "Este DNI o CUIT ya está registrado en nuestros sistemas.", "warning");
+                    }
+                    else
+                    {
+                        // Flujo normal: solicitud recibida, WA enviado
+                        await JS.InvokeVoidAsync("Swal.fire",
+                            new
+                            {
+                                title = "¡Solicitud enviada!",
+                                html  = "Te mandamos un WhatsApp para confirmar tus datos.<br><br>" +
+                                        "<strong>Revisá tu WhatsApp y tocá el botón para completar el registro.</strong>",
+                                icon  = "success",
+                                confirmButtonText = "Entendido",
+                                confirmButtonColor = "#2563eb"
+                            });
+                        // NO navegamos: el usuario debe ir a leer el WhatsApp
+                        registroModel = new RegistroUsuarioModel();
+                        mostrarCampos = false;
+                        NavigationManager.NavigateTo("/");
+                        StateHasChanged();
+                    }
+                }
+                else
+                {
+                    await JS.InvokeVoidAsync("Swal.fire", "Error", $"No se pudo enviar la solicitud: {textoRespuesta}", "error");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("Swal.fire", "Error de conexión", $"No pudimos conectar con el servidor: {ex.Message}", "error");
+        }
+        finally
+        {
+            isSubmitting = false;
+            StateHasChanged();
+        }
+    }
+}

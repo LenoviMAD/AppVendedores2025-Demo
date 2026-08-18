@@ -1,0 +1,92 @@
+@page "/MensajesARespnderWhatss"
+
+@using AppVendedores2025.Services
+@using Microsoft.JSInterop;
+@using System.Web;
+@using System.Text.Json;
+@using Microsoft.AspNetCore.Components.WebView.Maui
+@using Newtonsoft.Json;
+@inject IJSRuntime JS                                                                                                       
+@inject NavigationManager _navigationManager
+
+@if (Parametros.ModoDemo)
+{
+    <div class="posicionmarco">
+        <div class="alert alert-warning" role="alert">
+            <h4 class="alert-heading">Modo demo</h4>
+            <p><b>No disponible en modo demo</b></p>
+            <hr>
+            <p class="mb-0">Esta funcionalidad requiere credenciales reales de WhatsApp Business API, que no están configuradas en este entorno de demostración.</p>
+        </div>
+    </div>
+}
+else
+{
+    <div class="posicionmarco">
+    <div class="alert alert-primary" role="alert">
+        <h4 class="alert-heading">Hola @vdCod  </h4>
+        <p><b>Tienes Notificaciones Pendientes en Whatsapp</b></p>
+        <hr>
+        <p class="mb-0"><b>Por favor, revisa los mensajes de tu aplicacion de Whatsapp,ingresa al link enviado  y gestiona las  solicitudes que tengas pendientes para poder continuar.</b></p>
+    </div>
+    </div>
+}
+
+
+
+<div class="marcomagico"></div>
+
+<div>
+    <img class="btnatras" src="/img/girar-a-la-izquierda.png" @onclick="GoHome">
+</div>
+
+
+
+
+
+@code {
+
+
+
+    string vdCod = "";
+
+    ParametrosServices oParam = new ParametrosServices();
+
+    private async Task GoHome()
+    {
+        ParametrosServices oParametrosServices = new ParametrosServices();
+
+        string pa = oParametrosServices.PagePadre;
+        _navigationManager.NavigateTo(pa, true);
+
+
+    }
+    protected override async Task OnInitializedAsync()
+
+    {
+
+        IHttpClientFactory? httpFactory = null;
+
+        try
+        {
+            httpFactory = App.Current?.Handler?.MauiContext?.Services?.GetService<IHttpClientFactory>();
+            if (httpFactory == null)
+                throw new Exception("No se pudo resolver IHttpClientFactory. Verific� AddHttpClient() en MauiProgram.");
+        }
+        catch (Exception ex)
+        {
+            await App.Current.MainPage.DisplayAlert("Atenci�n", "Error inicializando HTTP: " + ex.Message, "OK");
+            
+        }
+
+        var oFuncionesSincronizar = new AppVendedores2025.Services.FuncionesSincronizar(httpFactory);
+
+        vdCod = oParam.NombreDelVendedor;
+        if (vdCod=="")
+        {
+            vdCod = "Vendedor";
+        }
+    }
+}
+
+

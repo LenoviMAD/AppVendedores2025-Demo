@@ -1,0 +1,23 @@
+﻿@using Microsoft.JSInterop
+
+@code {
+    private DotNetObjectReference<I18nBootstrapper>? _selfRef;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _selfRef = DotNetObjectReference.Create(this);
+            // pasar _selfRef a JS si lo necesitás:
+            // await JS.InvokeVoidAsync("i18n.init", _selfRef);
+        }
+    }
+
+    [JSInvokable]
+    public Task OnSomethingFromJs() { /* ... */ return Task.CompletedTask; }
+
+    public void Dispose()
+    {
+        _selfRef?.Dispose();
+    }
+}

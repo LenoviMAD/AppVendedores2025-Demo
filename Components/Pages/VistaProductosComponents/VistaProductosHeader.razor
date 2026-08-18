@@ -1,0 +1,76 @@
+@using EntidadesAppVendedores
+@using AppVendedores2025.Shared
+
+@inherits UtilCompartidas
+
+<div class="vph-wrapper">
+
+    <div class="vph-top">
+
+        <!-- Marca -->
+        <NavLink href="/catalogoProductos" class="vph-brand">
+            <span class="vph-brand-distri" @onclick="HandleOpenCategorias">Demo</span><span class="vph-brand-sur" @onclick="HandleOpenCategorias"> Ventas</span>
+        </NavLink>
+
+        <!-- Búsqueda -->
+        <div class="vph-search-wrap">
+            <i class="bi-search vph-search-icon"></i>
+            <input class="vph-search-input"
+                   type="search"
+                   id="searchInput"
+                   placeholder="Buscar producto..."
+                   value="@TextoFiltro"
+                   @oninput="(EventArgs) => { if (ListaDeProductosCargada) OnTextoCambiado.InvokeAsync(EventArgs.Value.ToString()); }" />
+        </div>
+
+        <!-- Carrito -->
+        <button class="vph-cart-btn" @onclick="HandleAbrirCarrito" aria-label="Carrito">
+            <i class="bi-cart3"></i>
+            @if (CantEnCart > 0)
+            {
+                <span class="vph-cart-badge">@CantEnCart</span>
+            }
+        </button>
+
+    </div>
+
+    <!-- Info cliente + total -->
+    <div class="vph-client-bar">
+        <div class="vph-client-main">
+            <i class="bi-person-fill vph-client-icon"></i>
+            <span class="vph-client-code">@ClienteItem.cli_codigo</span>
+            <span class="vph-client-name">@ClienteItem.cli_nombre</span>
+            <span class="vph-total">$&nbsp;@TotalCarrito</span>
+        </div>
+        <div class="vph-client-address">
+            <i class="bi-geo-alt"></i>
+            @ClienteItem.cli_direccion
+        </div>
+    </div>
+
+</div>
+
+@code {
+
+    [Parameter] public string TextoFiltro { get; set; } = string.Empty;
+    [Parameter] public int CantEnCart { get; set; }
+    [Parameter] public decimal TotalCarrito { get; set; }
+    [Parameter] public ClienteItem ClienteItem { get; set; } = new ClienteItem();
+    [Parameter] public bool TipoVendedor { get; set; }
+    [Parameter] public bool ModoTestGps { get; set; }
+    [Parameter] public bool ListaDeProductosCargada { get; set; }
+
+    [Parameter] public EventCallback<string> OnTextoCambiado { get; set; }
+    [Parameter] public EventCallback OnAbrirCarrito { get; set; }
+    [Parameter] public EventCallback OnOpenCategorias { get; set; }
+
+    private async Task HandleAbrirCarrito()
+    {
+        await OnAbrirCarrito.InvokeAsync();
+    }
+
+    private async Task HandleOpenCategorias()
+    {
+        await OnOpenCategorias.InvokeAsync();
+    }
+}

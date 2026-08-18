@@ -1,0 +1,312 @@
+@using EntidadesAppVendedores
+@using AppVendedores2025.Shared
+@using AppVendedores2025.Services
+@using System.Globalization
+
+@inherits UtilCompartidas
+
+@if (ProdInfoModal != null && ProdInfoModal.CodigoDeProducto != "")
+{
+    <div class="modal fade" id="myModal" data-backdrop="static" data-keyboard="false">
+        <div class="modal-dialog">
+            <div class="modal-content">
+
+                <!-- Hero: imagen con overlay -->
+                <div class="mpd-hero">
+                    <img class="mpd-hero-img" src="@ProdInfoModal.ImagenWeb" alt="@ProdInfoModal.Nombre" />
+                    <div class="mpd-hero-gradient"></div>
+
+                    <button class="mpd-close-btn" onclick="cerrarProductoConSlide()" aria-label="Cerrar">
+                        <i class="bi-chevron-down"></i>
+                    </button>
+
+                    @if (ProdInfoModal.StockEnUnidades < 1)
+                    {
+                        <div class="mpd-sinstock-ribbon">@AppResources.SinStock</div>
+                    }
+                    else if (ProdInfoModal.DesactivadoParaLaVenta)
+                    {
+                        <div class="mpd-sinstock-ribbon">🎁 Solo en combos</div>
+                    }
+
+                    <div class="mpd-hero-info">
+                        <div class="mpd-hero-name">@ProdInfoModal.Nombre</div>
+                        <div class="mpd-hero-meta">
+                            <span class="mpd-hero-code">@ProdInfoModal.Marca &nbsp;·&nbsp; @ProdInfoModal.CodigoDeProducto</span>
+                            @* @if (TieneDescuentoCombo())
+                            {
+                                <span class="mpd-hero-price-original">$&nbsp;@ProdInfoModal.PrecioUnitarioFinal(ListaaUsar)</span>
+                                <span class="mpd-hero-price mpd-hero-price--combo">$&nbsp;@MejorPrecioComboTexto</span>
+                            }
+                            else
+                            { *@
+                                <span class="mpd-hero-price">$&nbsp;@ProdInfoModal.PrecioUnitarioFinal(ListaaUsar)</span>
+                            @* } *@
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Body scrolleable -->
+                <div class="mpd-body">
+
+                    @if (!string.IsNullOrEmpty(TextoVD))
+                    {
+                        <div class="mpd-textovd">@TextoVD</div>
+                    }
+
+                    @if (ProdInfoModal.UnidadesPorBulto > 1 && ProdInfoModal.CantidadEnCarrito > 0)
+                    {
+                        <div class="mpd-bulto-info">
+                            <i class="bi-box-seam"></i>
+                            @AppResources.Llevas @ProdInfoModal.CantidadEnCarrito @AppResources.Cajas — @ProdInfoModal.UnidadesPorBulto @AppResources.Unidades
+                        </div>
+                    }
+
+                    @if (!ProdInfoModal.DesactivadoParaLaVenta && ProdInfoModal.StockEnUnidades > 0)
+                    {
+                        <div class="mpd-controls-card">
+
+                            <!-- Cantidad -->
+                            <div class="mpd-qty-row">
+                                <span class="mpd-qty-label">@AppResources.Cantidad</span>
+                                <div class="mpd-qty-stepper">
+                                    <button class="mpd-qty-btn" @onclick="() => OnCantidadChanged.InvokeAsync(-1)">&#8722;</button>
+                                    <input type="number"
+                                           class="mpd-qty-input"
+                                           id="inputProducto"
+                                           name="count"
+                                           min="0"
+                                           @bind-value="CantidadProductoModal"
+                                           @bind-value:event="oninput"
+                                           onclick="this.select();" />
+                                    <button class="mpd-qty-btn" @onclick="() => OnCantidadChanged.InvokeAsync(1)">+</button>
+                                </div>
+                            </div>
+
+                            <!-- Barra compacta: lista + CF/FA + Bultos -->
+                            <div class="mpd-options-bar">
+                                <select class="mpd-select"
+                                        @onchange="(args) => OnCambiarLista.InvokeAsync(args)">
+                                    @if (!TipoVendedor)
+                                    {
+                                        @if (TipoVD != 6)
+                                        {
+                                            @if (ListaaUsar == 3) { <option selected value="3">Autoservicios</option> } else { <option value="3">Autoservicios</option> }
+                                            @if (ListaaUsar == 1) { <option selected value="1">Especial Dist.</option> } else { <option value="1">Especial Dist.</option> }
+                                            @if (ListaaUsar == 5) { <option selected value="5">Almacen</option> } else { <option value="5">Almacen</option> }
+                                            @if (ListaaUsar == 6) { <option selected value="6">Kioskos</option> } else { <option value="6">Kioskos</option> }
+                                        }
+                                        else
+                                        {
+                                            @if (ListaaUsar == 4) { <option selected value="4">Salon</option> } else { <option value="4">Salon</option> }
+                                        }
+                                    }
+                                    else
+                                    {
+                                        @if (ListaaUsar == 3) { <option selected value="3">Autoservicios</option> }
+                                        @if (ListaaUsar == 1) { <option selected value="1">Especial Dist.</option> }
+                                        @if (ListaaUsar == 5) { <option selected value="5">Almacen</option> }
+                                        @if (ListaaUsar == 6) { <option selected value="6">Kioskos</option> }
+                                        @if (ListaaUsar == 4) { <option selected value="4">Salon</option> }
+                                        @if (ListaaUsar == 7) { <option selected value="7">E-commerce</option> }
+                                    }
+                                </select>
+
+                                @if (!CFenCliente || ClienteMCE != 0)
+                                {
+                                    <div class="mpd-options-divider"></div>
+                                    <div class="mpd-cf-group">
+                                        @if (!CFenCliente)
+                                        {
+                                            <label class="mpd-cf-option">
+                                                <input type="radio" name="flexRadioDefault" id="fcnormal"
+                                                       checked="@(!Cf)"
+                                                       @onchange="(args) => OnChangeCF.InvokeAsync((args, false))" />
+                                                Fac.A
+                                            </label>
+                                        }
+                                        @if (ClienteMCE != 0)
+                                        {
+                                            <label class="mpd-cf-option">
+                                                <input type="radio" name="flexRadioDefault" id="fccf"
+                                                       checked="@Cf"
+                                                       @onchange="(args) => OnChangeCF.InvokeAsync((args, true))" />
+                                                C.Final
+                                            </label>
+                                        }
+                                    </div>
+                                }
+
+                                @if (ProdInfoModal.UnidadesParaCompetarUnBulto > 1)
+                                {
+                                    <div class="mpd-options-divider"></div>
+                                    <div class="mpd-bulto-toggle">
+                                        <label class="mpd-bulto-opt">
+                                            <input type="radio" name="flexRadioDefault1" id="fcnormal"
+                                                   checked="@(!BultoV2)"
+                                                   @onchange="(args) => OnChangeBulto.InvokeAsync((args, false))" />
+                                            @AppResources.Unidades
+                                        </label>
+                                        <label class="mpd-bulto-opt">
+                                            <input type="radio" name="flexRadioDefault1" id="fccf"
+                                                   checked="@BultoV2"
+                                                   @onchange="(args) => OnChangeBulto.InvokeAsync((args, true))" />
+                                            @AppResources.Bultos
+                                        </label>
+                                    </div>
+                                }
+
+                            </div><!-- /mpd-options-bar -->
+
+                        </div><!-- /mpd-controls-card -->
+                    }
+
+                    <!-- Combos que incluyen este producto -->
+                    @if (HayCombos())
+                    {
+                        <div class="mpd-combos-card">
+                            <div class="mpd-combos-header">
+                                <i class="bi-stars"></i>
+                                <span style="flex:1">@AppResources.EnCombos</span>
+                                <span class="mpd-combos-header-badge">OFERTA</span>
+                            </div>
+                            <div class="mpd-combos-list">
+                                @{
+                                    var _combosConCargo = Combos
+                                        .Where(c => PreciosConCargoCombo.ContainsKey(c.CombosID))
+                                        .OrderBy(c => ParsearPrecioCombo(PreciosConCargoCombo[c.CombosID]))
+                                        .ToList();
+                                    var _combosSinCargo = Combos
+                                        .Where(c => !PreciosConCargoCombo.ContainsKey(c.CombosID))
+                                        .ToList();
+                                    var combosOrdenados = _combosSinCargo.Concat(_combosConCargo).ToList();
+                                }
+                                @foreach (var c in combosOrdenados)
+                                {
+                                    var _tieneConCargo = PreciosConCargoCombo.TryGetValue(c.CombosID, out var _precioTexto);
+                                    <div class="mpd-combo-item" @onclick="() => OnAbrirCombo.InvokeAsync(c.CombosID * -1)">
+                                        <div class="mpd-combo-icon-wrap">
+                                            <i class="bi-gift-fill"></i>
+                                        </div>
+                                        <div class="mpd-combo-item-text">
+                                            @c.NombreCombo
+                                            <div class="mpd-combo-item-sub">Ver combo completo</div>
+                                        </div>
+                                        @if (_tieneConCargo && !string.IsNullOrWhiteSpace(_precioTexto))
+                                        {
+                                            <div class="mpd-combo-price-wrap">
+                                                <span class="mpd-combo-item-price-orig">$&nbsp;@ProdInfoModal.PrecioUnitarioFinal(ListaaUsar)</span>
+                                                <span class="mpd-combo-item-price-combo">$&nbsp;@_precioTexto</span>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <span class="mpd-combo-sincargo-tag">Sin cargo</span>
+                                        }
+                                        <div class="mpd-combo-item-arrow">
+                                            <i class="bi-chevron-right"></i>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                </div><!-- /mpd-body -->
+
+                <!-- Footer -->
+                <div class="mpd-footer">
+                    @if (!ProdInfoModal.DesactivadoParaLaVenta && ProdInfoModal.StockEnUnidades > 0)
+                    {
+                        <button class="mpd-agregar-btn"
+                                @onclick="AgregarYCerrar">
+                            <i class="bi-cart-plus-fill"></i>
+                            @AppResources.AgregarCarrito
+                        </button>
+                    }
+                    else if (ProdInfoModal.DesactivadoParaLaVenta)
+                    {
+                        <div class="mpd-sinstock-footer">
+                            <i class="bi-gift-fill"></i>
+                            Solo disponible en combos
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="mpd-sinstock-footer">
+                            <i class="bi-exclamation-triangle-fill"></i>
+                            @AppResources.PorMomentoSinStock
+                        </div>
+                    }
+                    <div class="session-watermark">@_sessionTag</div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+
+    [Inject] private IJSRuntime JS { get; set; } = default!;
+
+    private string _sessionTag = "";
+
+    protected override void OnInitialized()
+    {
+        var p = new ParametrosServices();
+        _sessionTag = $"{p.Vendedor} · {p.cliente}";
+    }
+
+    [Parameter] public ProductoListaItem ProdInfoModal { get; set; } = new ProductoListaItem();
+    [Parameter] public int ListaaUsar { get; set; }
+    [Parameter] public int CantidadProductoModal { get; set; }
+    [Parameter] public bool TipoVendedor { get; set; }
+    [Parameter] public int TipoVD { get; set; }
+    [Parameter] public bool CFenCliente { get; set; }
+    [Parameter] public bool Cf { get; set; }
+    [Parameter] public bool BultoV2 { get; set; }
+    [Parameter] public int ClienteMCE { get; set; }
+    [Parameter] public string TextoVD { get; set; } = "";
+    [Parameter] public List<CombosEnUnProductoItem> Combos { get; set; } = new();
+    [Parameter] public string MejorPrecioComboTexto { get; set; } = "";
+    [Parameter] public Dictionary<int, string> PreciosConCargoCombo { get; set; } = new();
+
+    [Parameter] public EventCallback<int> OnCantidadChanged { get; set; }
+    [Parameter] public EventCallback<ChangeEventArgs> OnCambiarLista { get; set; }
+    [Parameter] public EventCallback<(ChangeEventArgs, bool)> OnChangeCF { get; set; }
+    [Parameter] public EventCallback<(ChangeEventArgs, bool)> OnChangeBulto { get; set; }
+    [Parameter] public EventCallback<ProductoListaItem> OnAgregarCarrito { get; set; }
+    [Parameter] public EventCallback<int> OnAbrirCombo { get; set; }
+
+    private bool HayCombos() => Combos != null && Combos.Count > 0;
+
+    private decimal ParsearPrecioCombo(string texto)
+    {
+        if (string.IsNullOrWhiteSpace(texto)) return 0;
+        texto = texto.Trim().Replace(".", "").Replace(",", ".");
+        return decimal.TryParse(texto, NumberStyles.Any, CultureInfo.InvariantCulture, out var v) ? v : 0;
+    }
+
+    private bool TieneDescuentoCombo()
+    {
+        try
+        {
+            if (ProdInfoModal == null || !HayCombos()) return false;
+            if (string.IsNullOrWhiteSpace(MejorPrecioComboTexto)) return false;
+            var precioCombo = ParsearPrecioCombo(MejorPrecioComboTexto);
+            if (precioCombo <= 0) return false;
+            var precioNormal = ProdInfoModal.PrecioUnitarioFinal(ListaaUsar);
+            return Math.Abs(precioNormal - precioCombo) >= 0.30M;
+        }
+        catch { return false; }
+    }
+
+    private async Task AgregarYCerrar()
+    {
+        int divisor = ProdInfoModal.UnidadesPorBulto > 0 ? ProdInfoModal.UnidadesPorBulto : 1;
+        ProdInfoModal.CantidadEnCarrito = CantidadProductoModal / divisor;
+        await OnAgregarCarrito.InvokeAsync(ProdInfoModal);
+        await JS.InvokeVoidAsync("cerrarProductoConSlide");
+    }
+}

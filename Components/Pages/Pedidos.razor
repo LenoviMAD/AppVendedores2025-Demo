@@ -1,0 +1,518 @@
+@page "/pedidos"
+@using System.Text;
+@using Microsoft.Extensions.Logging
+@inject IPedidoCabeceraService PedidoCabeceraService
+@inject IPedidosDetalleItemService PedidosDetalleItemService
+@inject IClienteItemService ClienteItemService
+@inject IProductoListaItem oProductoListaService
+@inherits UtilCompartidas
+@inject NavigationManager _navigationManager
+
+<link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
+
+@inject IJSRuntime JS
+
+<div class="ped-wrapper">
+
+    <!-- ── Encabezado de página ──────────────────────────────────────────── -->
+    <div class="ped-page-header">
+        <a href="/" class="ped-back-btn" aria-label="Volver">
+            <i class="bi bi-arrow-left-circle-fill"></i>
+        </a>
+        <h1 class="ped-page-title">@AppResources.ListadoPedidos</h1>
+    </div>
+
+    <!-- ── Lista de tarjetas ─────────────────────────────────────────────── -->
+    <div class="ped-list">
+
+        @foreach (var it in lsPedidosHeaders)
+        {
+            <div class="ped-card @CSSPedidos(it)">
+
+                <!-- Cabecera clicable: activa el collapse -->
+                <div class="ped-card-head"
+                     data-toggle="collapse"
+                     href="#@GenerarHtmlID(it.PedidoCabeceraID)"
+                     role="button"
+                     aria-expanded="false"
+                     aria-controls="@GenerarHtmlID(it.PedidoCabeceraID)">
+
+                    <div class="ped-head-left">
+                        <div class="ped-status-dot"></div>
+                        <div class="ped-head-info">
+                            <span class="ped-client-code">
+                                @AppResources.Cliente: <strong>@it.ClienteCodigo</strong>
+                            </span>
+                            @if (!autogestion)
+                            {
+                                <span class="ped-client-address">@it.ClienteDireccion</span>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="ped-head-right">
+                        <span class="ped-status-chip">@TextEstado(it.ResultadoTx)</span>
+                        <i class="bi bi-chevron-down ped-chevron-icon"></i>
+                    </div>
+                </div>
+
+                <!-- Fila resumen: fecha + total -->
+                <div class="ped-summary">
+                    @if (!autogestion)
+                    {
+                        <span class="ped-summary-item">
+                            <i class="bi bi-calendar3"></i>
+                            @it.FechaCarga
+                        </span>
+                        <span class="ped-summary-item">
+                            <i class="bi bi-geo-alt"></i>
+                            @AppResources.Direccion: @it.ClienteDireccion
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="ped-summary-item">
+                            <i class="bi bi-calendar3"></i>
+                            @it.FechaCarga
+                        </span>
+                        <span class="ped-summary-item">
+                            <i class="bi bi-info-circle"></i>
+                            @TextEstado(it.ResultadoTx)
+                        </span>
+                    }
+                    <span class="ped-summary-total">
+                        <i class="bi bi-receipt"></i>
+                        @it.TotalPedido.ToString("N2")
+                    </span>
+                </div>
+
+                <!-- Botones de acción -->
+                <div class="ped-actions">
+                    @if (!it.ResultadoTx.StartsWith("OK") && !autogestion)
+                    {
+                        <button class="ped-btn ped-btn-edit"
+                                @onclick="(args) => SeleccionarCliente(it.ClienteID)">
+                            <i class="bi bi-pencil-square"></i>
+                            @AppResources.ModificarPedido
+                        </button>
+                    }
+                    @if (it.ResultadoTx.StartsWith("OK") && !autogestion)
+                    {
+                        <button class="ped-btn ped-btn-reactivar"
+                                @onclick="(args) => ReactivarPedidoYRedirigirAsync(it.PedidoCabeceraID, it.ClienteID, it.ClienteCodigo)">
+                            <i class="bi bi-arrow-clockwise"></i>
+                            @AppResources.ModificarPedido
+                        </button>
+                    }
+                    <button class="ped-btn ped-btn-ver"
+                            data-toggle="collapse"
+                            href="#@GenerarHtmlID(it.PedidoCabeceraID)"
+                            role="button"
+                            aria-expanded="false"
+                            aria-controls="@GenerarHtmlID(it.PedidoCabeceraID)">
+                        <i class="bi bi-list-ul"></i>
+                        @AppResources.VerInformacionPedido
+                    </button>
+                </div>
+
+                <!-- Detalle colapsable: lista de productos -->
+                <div class="collapse" id="@GenerarHtmlID(it.PedidoCabeceraID)">
+                    <div class="ped-detail @CSSPedidos(it)">
+
+                        @foreach (PedidosDetalleItem itProd in it.LstProductos)
+                        {
+                            <div class="ped-product-row">
+                                <span class="ped-qty-badge">×@itProd.Cantidad</span>
+                                <span class="ped-product-name">@itProd.NombreProducto</span>
+                                <img class="fotoCart ped-product-img" src="@itProd.ImagenWeb" />
+                            </div>
+                        }
+
+                        @if (!autogestion)
+                        {
+                            <div class="ped-detail-footer">
+                                <button class="ped-btn ped-btn-delete"
+                                        @onclick="(args) => BorrarPedidoYRefrescar(it.ClienteID)">
+                                    <i class="bi bi-trash3"></i>
+                                    @AppResources.BorrarPedido
+                                </button>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+            </div>
+        }
+
+    </div>
+
+    @if (autogestion && lsPedidosRemotos.Any())
+    {
+        <div class="ped-page-header" style="margin-top:1.5rem;">
+            <h2 class="ped-page-title" style="font-size:1rem;">@AppResources.Enviado</h2>
+        </div>
+
+        <div class="ped-list">
+            @foreach (var it in lsPedidosRemotos)
+            {
+                <div class="ped-card ped_enviado">
+
+                    <div class="ped-card-head"
+                         data-toggle="collapse"
+                         href="#rem_@GenerarHtmlID(it.PedidoCabeceraID)"
+                         role="button"
+                         aria-expanded="false"
+                         aria-controls="rem_@GenerarHtmlID(it.PedidoCabeceraID)">
+
+                        <div class="ped-head-left">
+                            <div class="ped-status-dot"></div>
+                            <div class="ped-head-info">
+                                <span class="ped-client-code">
+                                    @AppResources.Cliente: <strong>@it.ClienteCodigo</strong>
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="ped-head-right">
+                            <span class="ped-status-chip">@AppResources.Enviado</span>
+                            <i class="bi bi-chevron-down ped-chevron-icon"></i>
+                        </div>
+                    </div>
+
+                    <div class="ped-summary">
+                        <span class="ped-summary-item">
+                            <i class="bi bi-calendar3"></i>
+                            @it.FechaCarga
+                        </span>
+                        <span class="ped-summary-item">
+                            <i class="bi bi-info-circle"></i>
+                            @AppResources.Enviado
+                        </span>
+                        <span class="ped-summary-total">
+                            <i class="bi bi-receipt"></i>
+                            @it.TotalPedido.ToString("N2")
+                        </span>
+                    </div>
+
+                    <div class="ped-actions">
+                        <button class="ped-btn ped-btn-ver"
+                                data-toggle="collapse"
+                                href="#rem_@GenerarHtmlID(it.PedidoCabeceraID)"
+                                role="button"
+                                aria-expanded="false"
+                                aria-controls="rem_@GenerarHtmlID(it.PedidoCabeceraID)">
+                            <i class="bi bi-list-ul"></i>
+                            @AppResources.VerInformacionPedido
+                        </button>
+                    </div>
+
+                    <div class="collapse" id="rem_@GenerarHtmlID(it.PedidoCabeceraID)">
+                        <div class="ped-detail ped_enviado">
+                            @foreach (PedidosDetalleItem itProd in it.LstProductos)
+                            {
+                                <div class="ped-product-row">
+                                    <span class="ped-qty-badge">×@itProd.Cantidad</span>
+                                    <span class="ped-product-name">@itProd.NombreProducto</span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+
+    [Inject] ILogger<Pedidos> _logger { get; set; } = default!;
+
+    List<PedidoCabeceraItem> lsPedidosHeaders = new List<PedidoCabeceraItem>();
+    List<PedidoCabeceraItem> lsPedidosRemotos = new List<PedidoCabeceraItem>();
+    bool autogestion;
+    protected override async Task OnInitializedAsync()
+    {
+        ParametrosServices oParam = new ParametrosServices();
+
+        autogestion = oParam.Autogestion;
+
+        Traer();
+
+        if (autogestion)
+            await TraerRemotosAsync();
+    }
+
+    protected async override Task OnAfterRenderAsync(bool firstRender)
+    {
+        try
+        {
+
+            if (firstRender)
+            {
+                ParametrosServices oParam = new ParametrosServices();
+
+                oParam.PagePadre = "pedidos";
+
+            }
+        }
+        catch
+        {
+
+        }
+    }
+
+
+    public async Task<string> TraerImagen(int prodID)
+    {
+
+        ProductoListaService oProductoListaService = new ProductoListaService();
+        var prod = await oProductoListaService.GetByID(prodID);
+
+
+        return prod.ImagenWeb;
+
+    }
+
+
+
+    private async Task TraerRemotosAsync()
+    {
+        try
+        {
+            ParametrosServices oParam = new ParametrosServices();
+            int clienteID = oParam.ClienteID;
+            if (clienteID <= 0) return;
+
+            PedidoCabeceraService oPedidoCabeceraService = new PedidoCabeceraService();
+            lsPedidosRemotos = await oPedidoCabeceraService.GetUltimosPedidosRemotosAsync(clienteID);
+            this.StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error al traer pedidos remotos autogestion");
+        }
+    }
+
+    private async Task Traer()
+    {
+        PedidoCabeceraService oPedidoCabeceraService = new PedidoCabeceraService();
+        PedidosDetalleItemService oPedidosDetalleItemService = new PedidosDetalleItemService();
+        lsPedidosHeaders = await oPedidoCabeceraService.GetAll();
+
+        foreach (PedidoCabeceraItem itPedido in lsPedidosHeaders)
+        {
+            itPedido.TotalPedido = 0;
+            var pedDetalle = await oPedidosDetalleItemService.GetByPedidoCabezaraID(itPedido.PedidoCabeceraID);
+            foreach (var itP in pedDetalle)
+            {
+                itP.ImagenWeb = await TraerImagen(itP.ProductoID);
+                itPedido.TotalPedido += itP.Cantidad * Convert.ToDecimal(itP.PrecioUnitarioFinal) * itP.UnidadesPorBulto;
+            }
+            //  itPedido
+            itPedido.LstProductos.AddRange(pedDetalle);
+        }
+        this.StateHasChanged();
+    }
+
+
+    private async Task MsjError(PedidoCabeceraItem it)
+    {
+        var tituloE = @TextEstado(it.ResultadoTx);
+        var msjE = it.ResultadoTx;
+        await App.Current.MainPage.DisplayAlert(tituloE, msjE, "OK");
+
+    }
+
+
+    private string CSSPedidos(PedidoCabeceraItem it)
+    {
+        var enviado = it.ResultadoTx;
+        var cerrado = it.PedidoCerrado;
+
+        var css = "";
+        if (!cerrado)
+        {
+            //blanco  peddo abierto
+            css = "ped_ingresado";
+        }
+        else if (enviado == "")
+        {
+            css = "ped_pendiente";
+
+        }
+        else if (enviado.ToUpper().StartsWith("OK"))
+        {
+            css = "ped_enviado";
+        }
+        else if (enviado.ToUpper().StartsWith("ERR"))
+        {
+            css = "ped_error";
+        }
+
+        //else if (enviado == 0) { }
+        return css;
+    }
+    private string TextEstado(string estado)
+    {
+        var estadoPed = "";
+        if (estado == "")
+        {
+            estadoPed = AppResources.Pendiente;
+        }
+        else if (estado.ToUpper().StartsWith("OK"))
+        {
+            estadoPed = AppResources.Enviado;
+        }
+        else if (estado.ToUpper().StartsWith("ERR"))
+        {
+            estadoPed = "Error";
+        }
+
+        return estadoPed;
+    }
+    private string TextCerrado(bool estado)
+    {
+        var estadoPed = "";
+        if (estado)
+        {
+            estadoPed = AppResources.Cerrado;
+        }
+        else
+        {
+            estadoPed = AppResources.Abierto;
+        }
+        return estadoPed;
+    }
+    private string GenerarHtmlID(int cabid)
+    {
+
+        return "id" + cabid.ToString();
+    }
+
+
+
+    private async Task CerrarPedido(int pedidoCabeceraID)
+    {
+        PedidoCabeceraService oPedidoCabeceraService = new PedidoCabeceraService();
+
+        var header = await oPedidoCabeceraService.GetByCabeceraID(pedidoCabeceraID);
+
+        string msgErrorArrastres = "";
+        bool pedidoValidoArrastres = true;
+        ProductoListaService oProductoListaService = new ProductoListaService();
+        var cartview = await oProductoListaService.LlenarCantidadEnCarritoCombos(header.ClienteID);
+        var cartviewCombos = await GenerarCarritoProductoCombos(header.ClienteID);
+
+        var lsCombos = cartviewCombos.GroupBy(c => c.ComboID).ToList();
+        foreach (var itCombo in lsCombos)
+        {
+            var resv = await oProductoListaService.GetValidarCombo(itCombo.Key, cartview, cartviewCombos, header.ClienteID);
+
+            if (!resv.Resultado)
+            {
+                pedidoValidoArrastres = false;
+                msgErrorArrastres += resv.Mensaje;
+            }
+
+        }
+        if (!pedidoValidoArrastres)
+        {
+            await App.Current.MainPage.DisplayAlert(AppResources.ErrorArrastreCombo, msgErrorArrastres, AppResources.Aceptar);
+        }
+        if (pedidoValidoArrastres)
+        {
+
+            var res = await App.Current.MainPage.DisplayAlert(AppResources.Confirmacion, "", AppResources.Aceptar, AppResources.No);
+
+
+            //validar arrasatre    pedidoCabeceraID
+
+            if (res)
+            {
+                await oPedidoCabeceraService.CerrarPedido(pedidoCabeceraID);
+                Traer();
+
+            }
+        }
+    }
+    private async Task ReabrirPedido(int pedidoCabeceraID)
+    {
+
+        {
+            PedidoCabeceraService oPedidoCabeceraService = new PedidoCabeceraService();
+            await oPedidoCabeceraService.ReabrirPedido(pedidoCabeceraID);
+            Traer();
+        }
+    }
+    ParametrosServices oParam = new ParametrosServices();
+    private async Task<bool> SeleccionarCliente(int id)
+    {
+        ClienteItemService oClientesItemService = new ClienteItemService();
+        var it = await oClientesItemService.GetByID(id);
+        {
+
+            await oParam.AddorUpdateAsync("cliente", it.cli_codigo, 0, new DateTime());
+            await oParam.AddorUpdateAsync("clienteID", "", it.cli_clientesid, new DateTime());
+
+            _navigationManager.NavigateTo("/vistaProductos/" + 100005, true);
+        }
+
+        return true;
+    }
+
+    [Inject] NavigationManager _nav { get; set; } = default!;
+    // [Inject] AppVendedores2025.Services.PedidoCabeceraService _pedidos { get; set; } = default!;
+
+    private async Task BorrarPedidoYRefrescar(int clienteID)
+    {
+        var resultado = await BorrarPedidoSinTx(clienteID);
+        if (resultado == 0)
+            await Traer();
+    }
+
+    private async Task<bool> ReactivarPedidoYRedirigirAsync(int pedidosCabeceraID, int clienteID, string codigoCliente, int tipoVista = 100005)
+    {
+        try
+        {
+           
+            PedidoCabeceraService oPedidoCabeceraService = new PedidoCabeceraService();
+
+            var res = await App.Current.MainPage.DisplayAlert(AppResources.Atencion, AppResources.BorrarPedidosAlRestramitir, AppResources.Continuar, AppResources.Cancelar);
+            if (res)
+            {
+                var (ok, nuevoId, error) = await oPedidoCabeceraService.DuplicarPedidoAsync(pedidosCabeceraID);
+
+                //BorrarPedidobyCabeceraId(pedidosCabeceraID);
+
+                if (!ok)
+                {
+                    // Manejo de error
+                    Console.WriteLine("No se pudo duplicar: " + error);
+                }
+                else
+                {
+                    pedidosCabeceraID = nuevoId ?? 0;
+                    Console.WriteLine("Pedido duplicado. Nuevo ID: " + nuevoId);
+                }
+            }
+            else
+            {
+                return false;
+            }
+            oParam.CabeceraCarritoID = pedidosCabeceraID;
+            oParam.ReactivarCarrito = true;
+
+            oParam.ClienteID = clienteID;
+            oParam.cliente = codigoCliente;
+            // Navegamos pasando �se�ales� por QS
+            _navigationManager.NavigateTo("/vistaProductos/" + 100005, true);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error al reactivar {Cabecera}", pedidosCabeceraID);
+            return false;
+        }
+    }
+}

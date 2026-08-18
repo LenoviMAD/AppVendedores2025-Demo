@@ -1,0 +1,506 @@
+@page "/clientes"
+@inject IClienteItemService ClienteItemService
+@inject NavigationManager _navigationManager
+@inject App.TimerService timerService
+@inject AppVendedores2025.Services.PermisosUbicacionService Permisos
+@using System.Net.Http.Json
+@using AppVendedores2025.Services
+@using EntidadesAppVendedores
+@using Microsoft.JSInterop
+@using AppVendedores2025.Resources.Strings
+@using AppVendedores2025.Localization
+
+
+<link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
+@*  @using MudBlazor *@
+
+@inject IJSRuntime JS
+
+
+<div class="clientes-page">
+
+    <!-- Header -->
+    <div class="clientes-header">
+        <a href="/" class="clientes-back-btn">
+            <i class="bi-chevron-left"></i>
+        </a>
+        <h1 class="clientes-title">@AppResources.Clientes</h1>
+        <div class="clientes-header-spacer"></div>
+    </div>
+
+    <!-- Buscador -->
+    <div class="clientes-search-wrapper">
+        <div class="clientes-search-inner">
+            <i class="bi bi-search clientes-search-icon"></i>
+            <input type="text"
+                   class="clientes-search-input"
+                   placeholder="@AppResources.Buscar..."
+                   value="@SearchText"
+                   @oninput="OnSearchInput" />
+            @if (!string.IsNullOrEmpty(SearchText))
+            {
+                <button class="clientes-search-clear" @onclick="ClearSearch">
+                    <i class="bi-x-circle-fill"></i>
+                </button>
+            }
+        </div>
+    </div>
+
+    <!-- Lista de clientes -->
+    <div class="clientes-list">
+        @if (lsClientes == null)
+        {
+            <div id="loader">
+                <i class="fas fa-spinner fa-spin"></i>
+            </div>
+        }
+        else
+        {
+            @foreach (var cli in lsClientes)
+            {
+                bool esBloqueado = cli.cli_nombre?.Contains("Bloqueado!") == true;
+                string statusColor = GetEstadoClass(cli);
+
+                <div class="cliente-card @(esBloqueado ? "cliente-card-bloqueado" : "")"
+                     @onclick="(args) => SeleccionarCliente(cli)">
+
+                    <!-- Franja de estado -->
+                    <div class="cliente-status-strip"
+                         style="background-color: @(string.IsNullOrEmpty(statusColor) ? "#e0e5ec" : statusColor);"></div>
+
+                    <!-- Cuerpo -->
+                    <div class="cliente-card-body">
+                        <div class="cliente-nombre @(esBloqueado ? "cliente-nombre-bloqueado" : "")">
+                            @if (esBloqueado)
+                            {
+                                <i class="bi bi-lock-fill" style="font-size:12px; margin-right:4px;"></i>
+                            }
+                            @cli.cli_nombre
+                        </div>
+                        <div class="cliente-info">
+                            @if (!string.IsNullOrEmpty(cli.cli_codigo))
+                            {
+                                <span class="cliente-cod">@cli.cli_codigo</span>
+                            }
+                            @if (!string.IsNullOrEmpty(cli.cli_direccion))
+                            {
+                                <span class="cliente-dir">
+                                    <i class="bi-geo-alt" style="font-size:11px;"></i> @cli.cli_direccion
+                                </span>
+                            }
+                        </div>
+                        <div class="cliente-meta">
+                            @if (cli.cli_porcentajepercepcionib >= 0)
+                            {
+                                <span class="cliente-iibb">IIBB @cli.cli_porcentajepercepcionib%</span>
+                            }
+                            @if (cli.DiasNoVenta > 30)
+                            {
+                                <span class="cliente-ultima-venta cliente-venta-alerta">
+                                    <i class="bi-exclamation-circle" style="font-size:10px;"></i>
+                                    Últ. venta: @cli.DiasNoVenta días
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="cliente-ultima-venta">
+                                    <i class="bi-calendar3" style="font-size:10px;"></i>
+                                    Últ. venta: @cli.DiasNoVenta días
+                                </span>
+                            }
+                            @if (mostrarDistancia)
+                            {
+                                <span class="cliente-distancia">
+                                    <i class="bi-pin-map" style="font-size:10px;"></i>
+                                    @cli.Distancia.ToString("F2") km
+                                </span>
+                            }
+                        </div>
+                        @if (cli.DiasNoVenta > 30)
+                        {
+                            <div class="cliente-visita-obligatoria-fila">
+                                <i class="bi-star-half"></i>
+                                Visita Obligatoria
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Acciones -->
+                    <div class="cliente-card-actions">
+                        @if (tipoVD != 5)
+                        {
+                            <button class="cliente-map-btn cliente-map-btn-gmaps"
+                                    @onclick:stopPropagation="true"
+                                    @onclick="(args) => verClienteEnGoogleMap(cli.cli_clientesid)">
+                                <img src="/img/MapG.png" alt="map" />
+                                <span>Cómo llegar</span>
+                            </button>
+                        }
+                        else
+                        {
+                            <button class="cliente-map-btn"
+                                    @onclick:stopPropagation="true"
+                                    @onclick="(args) => LinkWhatsapp(cli)">
+                                <img src="/img/wa.png" alt="whatsapp" />
+                            </button>
+                        }
+                        <i class="bi bi-chevron-right cliente-chevron"></i>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+
+    @if (mostrarDistancia)
+    {
+        <div id="divbannerGMaps">
+            <img src="/img/gmaps2.png" class="bannerGMaps" @onclick="(args) => VerClientesGoogle()" alt="map" />
+        </div>
+    }
+
+</div><!-- /clientes-page -->
+@* Modal GMaps (reservado para uso JS) *@
+<div class="modal fade" id="gMapsModal" tabindex="-1" aria-labelledby="gMapsModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div id="mapgoogle"></div>
+            <button type="button" class="btn-close btn-closeMap">Regresar</button>
+        </div>
+    </div>
+</div>
+
+@code {
+
+    // ============================
+    // EXISTENTES (mantengo nombres/uso)
+    // ============================
+    private IEnumerable<EntidadesAppVendedores.ClienteItem> lsClientes = null; // <- se mantiene para renderizar (filtrados)
+    string txtVD = "Usuario";
+    string txtPwd = "Clave";
+    bool mostrarDistancia = true;
+    string vdCod = "";
+    int tipoVD = 0;
+    string versionDatos;
+    string mensajeError = "";
+
+    List<ClienteItem> lsClientes1 = new List<ClienteItem>();
+    Ubicacion posvd = new Ubicacion();
+    private static bool initLoader = false;
+
+    // ============================
+    // NUEVO: Soporte de búsqueda
+    // ============================
+    // Fuente completa (sin filtro)
+    private List<EntidadesAppVendedores.ClienteItem> lsClientesSource = new();
+
+    // Texto del buscador
+    private string SearchText { get; set; } = string.Empty;
+
+    // Debounce
+    private System.Timers.Timer _debounceTimer;
+    private readonly object _timerLock = new();
+
+    // Para mostrar errores del buscador (sin interferir con los otros)
+    private string _errorBuscador;
+
+    private async Task VerClientesGoogle()
+    {
+        string vdCodsss = await JS.InvokeAsync<string>("initMap", lsClientes1, posvd);
+    }
+
+    private async Task InitLoader()
+    {
+        if (initLoader) return;
+        initLoader = true;
+        await JS.InvokeVoidAsync("showLoader");
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await InitLoader();
+
+            if (firstRender)
+            {
+                ParametrosServices oParam = new ParametrosServices();
+                oParam.PagePadre = "clientes";
+            }
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //   await JS.InvokeVoidAsync("showLoader");
+
+        try
+        {
+            ParametrosServices oParam = new ParametrosServices();
+            ClienteItemService oClienteItemService = new ClienteItemService();
+            var oGPS = new GPSService();
+
+            posvd = await oGPS.GetCurrentLocationV2(JS);
+            vdCod = oParam.Vendedor;
+            tipoVD = oParam.tipoVD;
+
+            string vdCodUp = (vdCod ?? "").ToUpper();
+            if (vdCodUp.StartsWith("VG") || vdCodUp.StartsWith("VV") || tipoVD == 5)
+                mostrarDistancia = false;
+
+            if (posvd == null || posvd.latitud == 0)
+            {
+                await App.Current.MainPage.DisplayAlert("Atencion", "GPS no disponible", "OK");
+            }
+
+            if (oParam.DeviceID == "ESP")
+            {
+                lsClientes1 = await oClienteItemService.GetAll();
+                lsClientes1 = lsClientes1.OrderBy(c => c.cli_codigo).ToList();
+            }
+            else
+            {
+                lsClientes1 = await oGPS.OrdenarClientesporDistancia(posvd);
+            }
+
+            // (Tu código comentado de versión de datos queda intacto)
+
+            // =========== CAMBIO CLAVE (mínimo y controlado) ===========
+            // Antes: lsClientes = lsClientes1.AsEnumerable<ClienteItem>();
+            // Ahora: guardo una copia fuente y aplico filtro para que el foreach use lsClientes ya filtrado.
+            lsClientesSource = lsClientes1.Cast<EntidadesAppVendedores.ClienteItem>().ToList();
+            AplicarFiltro(); // primera carga sin texto => muestra todo
+
+            // ==========================================================
+
+            // Post-procesamiento que ya hacías (estado cli_reba)
+            PedidoCabeceraService oPedidoCabeceraService = new PedidoCabeceraService();
+            foreach (var item in lsClientesSource)
+            {
+                var ultPedido = await oPedidoCabeceraService.GetByClienteIDUltimo(item.cli_clientesid);
+
+                if (ultPedido != null)
+                {
+                    if (ultPedido.ResultadoTx.StartsWith("OK"))
+                    {
+                        item.cli_reba = 1; // transmitido
+                    }
+                    else
+                    {
+                        var opeds = new PedidosDetalleItemService();
+                        var res = await opeds.GetByPedidoCabezaraID(ultPedido.PedidoCabeceraID);
+
+                        if (res.Any())
+                            item.cli_reba = 2; // error o no transm
+                        else
+                            item.cli_reba = 3; // sin items => no transm
+                    }
+                }
+                else
+                {
+                    item.cli_reba = 3; // no hay pedido
+                }
+            }
+
+            // Re-aplico filtro por si cambió algo visible
+            AplicarFiltro();
+
+        }
+        catch (Exception ex)
+        {
+            _errorBuscador = $"Error leyendo el texto de búsqueda: {ex.Message}";
+
+        }
+
+        await JS.InvokeVoidAsync("hideLoader");
+        this.StateHasChanged();
+    }
+
+    private async Task verClienteEnGoogleMap(int clienteID)
+    {
+
+        GPSService oGPS = new GPSService();
+        var ubicacionCliente = await oGPS.GetUbicacionCliente(clienteID);
+        var linkGMapsCliente = "https://maps.google.com/?q=" + ubicacionCliente.latitud.ToString().Replace(",", ".") + "," + ubicacionCliente.longitud.ToString().Replace(",", ".");
+#if IOS
+             await Browser.Default.OpenAsync(linkGMapsCliente, BrowserLaunchMode.SystemPreferred);
+#else
+        _navigationManager.NavigateTo(linkGMapsCliente, true);
+#endif
+    }
+
+    private void LinkWhatsapp(ClienteItem cli)
+    {
+        var datos = System.Web.HttpUtility.UrlEncode("Hola " + cli.cli_nombre);
+        var LinkWhatsapp = "https://api.whatsapp.com/send?phone=" + cli.cli_telefono + "&text=" + datos;
+        _navigationManager.NavigateTo(LinkWhatsapp, true);
+    }
+
+    private async Task<bool> SeleccionarCliente(ClienteItem it)
+    {
+        ParametrosServices oParam = new ParametrosServices();
+
+        bool clienteseleccionado = true;
+
+        DateTime hoy = DateTime.Today;
+        if ((oParam.FechaUltimaSincronizacion == DateTime.MinValue ||
+                        oParam.FechaUltimaSincronizacion < hoy) && oParam.Vendedor != null && oParam.Vendedor != "")
+        {
+            _navigationManager.NavigateTo("/");
+            return true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(it.MensajeDevolucion))
+        {
+            clienteseleccionado = await App.Current.MainPage.DisplayAlert("ATENCION", it.MensajeDevolucion, "Ingresar", "Salir");
+        }
+
+        if (!clienteseleccionado)
+            return false;
+
+        if (it.cli_nombre.Contains("Bloqueado!"))
+        {
+            await App.Current.MainPage.DisplayAlert("ATENCION", "Usuario Bloqueado, debe suministrar un teléfono del Cliente en el Portal", "OK");
+            return false;
+        }
+
+        if (it.CUITValido == 0)
+        {
+            clienteseleccionado = await App.Current.MainPage.DisplayAlert("Cliente:", "CUIT no apto para factura A. Solo CONSUMIDOR FINAL", "Ingresar", "Salir");
+        }
+
+        if (clienteseleccionado)
+        {
+            oParam.ClienteID = it.cli_clientesid;
+            oParam.cliente = it.cli_codigo;
+            _navigationManager.NavigateTo("/vistaProductos/" + 100002, true);
+        }
+        return true;
+    }
+
+    private string GetEstadoClass(EntidadesAppVendedores.ClienteItem cli)
+    {
+        var color = cli.cli_reba;
+        var visitado = cli.Visistado;
+
+        if (color == 3)
+            return !visitado ? "yellow" : "white";
+        if (color == 2)
+            return "#ff8300"; // Naranja
+        if (color == 1)
+            return "green";
+        return "";
+    }
+
+    // =========================================
+    // NUEVO: Lógica del buscador (con debounce)
+    // =========================================
+
+    private void OnSearchInput(ChangeEventArgs e)
+    {
+        try
+        {
+            SearchText = e?.Value?.ToString() ?? string.Empty;
+            DebounceFilter();
+        }
+        catch (Exception ex)
+        {
+            _errorBuscador = $"Error leyendo el texto de búsqueda: {ex.Message}";
+        }
+    }
+
+    private void ClearSearch()
+    {
+        SearchText = string.Empty;
+        DebounceFilter();
+    }
+
+    private void DebounceFilter(int delayMs = 250)
+    {
+        try
+        {
+            lock (_timerLock)
+            {
+                _debounceTimer?.Stop();
+                _debounceTimer?.Dispose();
+
+                _debounceTimer = new System.Timers.Timer(delayMs)
+                {
+                    AutoReset = false
+                };
+                _debounceTimer.Elapsed += (_, __) =>
+                {
+                    _debounceTimer?.Stop();
+                    _debounceTimer?.Dispose();
+                    _debounceTimer = null;
+
+                    InvokeAsync(() =>
+                    {
+                        try
+                        {
+                            AplicarFiltro();
+                        }
+                        catch (Exception ex)
+                        {
+                            _errorBuscador = $"Error al filtrar: {ex.Message}";
+                            lsClientes = Enumerable.Empty<EntidadesAppVendedores.ClienteItem>();
+                        }
+                        StateHasChanged();
+                    });
+                };
+                _debounceTimer.Start();
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorBuscador = $"Error del buscador: {ex.Message}";
+        }
+    }
+
+    private void AplicarFiltro()
+    {
+        try
+        {
+            if (lsClientesSource is null)
+            {
+                lsClientes = Enumerable.Empty<EntidadesAppVendedores.ClienteItem>();
+                return;
+            }
+
+            var texto = (SearchText ?? string.Empty).Trim().ToLowerInvariant();
+
+            if (string.IsNullOrEmpty(texto))
+            {
+                // Sin filtro: muestro todo
+                lsClientes = lsClientesSource;
+                return;
+            }
+
+            bool Match(EntidadesAppVendedores.ClienteItem c)
+                => Contiene(c.cli_nombre, texto)
+                || Contiene(c.cli_direccion, texto)
+                || Contiene(c.cli_codigo, texto);
+
+            lsClientes = lsClientesSource.Where(Match).ToList();
+        }
+        catch (Exception ex)
+        {
+            _errorBuscador = $"No se pudo aplicar el filtro: {ex.Message}";
+            lsClientes = Enumerable.Empty<EntidadesAppVendedores.ClienteItem>();
+        }
+    }
+
+    private static bool Contiene(string haystack, string needle)
+        => !string.IsNullOrWhiteSpace(haystack)
+           && haystack.Trim().ToLowerInvariant().Contains(needle);
+
+    // Limpieza del timer del buscador
+    public void Dispose()
+    {
+        lock (_timerLock)
+        {
+            _debounceTimer?.Stop();
+            _debounceTimer?.Dispose();
+            _debounceTimer = null;
+        }
+    }
+}

@@ -1,0 +1,130 @@
+@using AppVendedores2025.Resources.Strings
+@using AppVendedores2025.Components
+
+<div class="login-wrapper">
+    
+    <div class="language-selector">
+        <LanguageSelect />
+    </div>
+
+    <div class="login-header">
+        <img src="img/vendixIcono.png" alt="Vendix" class="login-logo" />
+        <h2 class="login-subtitle">@AppResources.LoginSubtitulo</h2>
+    </div>
+
+    <div class="login-body" id="bottomInput">
+        <img src="img/personaIndex.png" alt="Repartidor" class="person-image" />
+        
+        <div class="login-card">
+            
+            <div class="input-wrapper">
+                <div style="background-color:rgb(10 62 137) !important;" class="input-group-text text-white border-primary ">
+                    <i class="bi-person-fill"></i>
+                </div>
+                <input @bind="@InternalTxtVD" @bind:event="oninput" placeholder="@AppResources.Usuario" id="usuario" class="login-input ms-2" autocomplete="username" />
+            </div>
+
+            <div class="input-wrapper">
+                <div style="background-color:rgb(10 62 137) !important;" class="input-group-text text-white border-primary" >
+                    <i class="bi-lock-fill"></i>
+                </div>
+                <input type="@_passwordInputType" @bind="@InternalTxtPwd" @bind:event="oninput" placeholder="@AppResources.Clave" class="login-input ms-2" autocomplete="current-password" />
+                <button type="button" class="input-icon-right" @onclick="TogglePasswordVisibility">
+                    <i class="@_passwordIconCss"></i>
+                </button>
+            </div>
+
+            <div>
+                <button type="button" id="btn_Ingresar" class="btn-login" @onclick="OnIngresarClick">
+                    @AppResources.Ingresar
+                    <i class="bi-box-arrow-in-right"></i>
+                </button>
+            </div>
+
+            <div class="login-divider">
+                <span>@AppResources.LoginDivider</span>
+            </div>
+
+            <div class="separator-line-custom"></div>
+            <button type="button" class="btn-create-account" @onclick="OnCrearUsuarioClick">
+                <i class="bi bi-person-plus-fill icon-left"></i>
+                @AppResources.CrearUsuario
+                <i class="bi bi-chevron-right icon-right"></i>
+            </button>
+
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(VersionApp))
+    {
+        <div style="position:absolute;bottom:10px;right:14px;font-family:'Inter','Segoe UI',sans-serif;font-size:0.68rem;font-weight:600;color:rgba(255,255,255,0.55);letter-spacing:0.5px;pointer-events:none;user-select:none;">
+            v@(VersionApp)
+        </div>
+    }
+</div>
+
+<ModalPermisoGPS @bind-Open="InternalOpen"
+                 OnAccept="OnAcceptGPS"
+                 OnDeny="OnDenyGPS"
+                 HideDenyButton="HideDenyOnIOS"
+                 DialogSizeClass="modal-lg"
+                 IconCss="bi bi-geo-alt-fill text-primary"
+                 ImageUrl="/img/gps_pr.png"
+                 ImageAlt="Mapa con pings"
+                 AcceptText="@AppResources.Continuar"
+                 DenyText="@AppResources.Denegar"
+                 CloseOnBackdropClick="true" />
+
+@code {
+    [Parameter] public string TxtVD { get; set; } = "";
+    [Parameter] public EventCallback<string> TxtVDChanged { get; set; }
+    
+    private string InternalTxtVD
+    {
+        get => TxtVD;
+        set => TxtVDChanged.InvokeAsync(value);
+    }
+
+    [Parameter] public string TxtPwd { get; set; } = "";
+    [Parameter] public EventCallback<string> TxtPwdChanged { get; set; }
+
+    private string InternalTxtPwd
+    {
+        get => TxtPwd;
+        set => TxtPwdChanged.InvokeAsync(value);
+    }
+
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+
+    private bool InternalOpen
+    {
+        get => Open;
+        set => OpenChanged.InvokeAsync(value);
+    }
+
+    [Parameter] public bool HideDenyOnIOS { get; set; }
+    [Parameter] public string VersionApp { get; set; } = "";
+
+    [Parameter] public EventCallback OnIngresarClick { get; set; }
+    [Parameter] public EventCallback OnCrearUsuarioClick { get; set; }
+    [Parameter] public EventCallback OnAcceptGPS { get; set; }
+    [Parameter] public EventCallback OnDenyGPS { get; set; }
+
+    private string _passwordInputType = "password";
+    private string _passwordIconCss = "bi bi-eye";
+
+    private void TogglePasswordVisibility()
+    {
+        if (_passwordInputType == "password")
+        {
+            _passwordInputType = "text";
+            _passwordIconCss = "bi bi-eye-slash";
+        }
+        else
+        {
+            _passwordInputType = "password";
+            _passwordIconCss = "bi bi-eye";
+        }
+    }
+}

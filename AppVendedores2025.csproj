@@ -1,0 +1,254 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+	<PropertyGroup>
+		<!--<TargetFrameworks>net8.0-ios;net9.0-android;net9.0-maccatalyst;net9.0-windows10.0.19041.0</TargetFrameworks>-->
+		<!--<TargetFrameworks>net8.0-ios;net9.0-android;net9.0-maccatalyst</TargetFrameworks>-->
+		<TargetFrameworks>net9.0-android;net9.0-maccatalyst;net9.0-ios</TargetFrameworks>
+		<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net9.0-windows10.0.19041.0</TargetFrameworks>
+
+		<!-- SDK anterior para revisar si influía en la resolución de workloads -->
+		<!-- <Project Sdk="Microsoft.NET.Sdk.Razor"> -->
+
+		<!-- Uncomment to also build the tizen app. You will need to install tizen by following this: https://github.com/Samsung/Tizen.NET -->
+		<!-- <TargetFrameworks>$(TargetFrameworks);net9.0-tizen</TargetFrameworks> -->
+
+		<!-- Note for MacCatalyst: The default runtime is maccatalyst-x64, except in Release config, in which case the default is maccatalyst-x64;maccatalyst-arm64. When specifying both architectures, use the plural <RuntimeIdentifiers> instead of the singular <RuntimeIdentifier>. The Mac App Store will NOT accept apps with ONLY maccatalyst-arm64 indicated; either BOTH runtimes must be indicated or ONLY macatalyst-x64. -->
+		<!-- For example: <RuntimeIdentifiers>maccatalyst-x64;maccatalyst-arm64</RuntimeIdentifiers> -->
+
+		<OutputType>Exe</OutputType>
+		<RootNamespace>AppVendedores2025</RootNamespace>
+		<UseMaui>true</UseMaui>
+		<SingleProject>true</SingleProject>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<EnableDefaultCssItems>false</EnableDefaultCssItems>
+		<Nullable>enable</Nullable>
+
+		<!-- Display name -->
+		<!--Android-->
+		<!--<ApplicationTitle>AppVendedores2025</ApplicationTitle>-->
+		<!--IOS-->
+		<ApplicationTitle>AppVendedores2025 Demo</ApplicationTitle>
+
+		<!-- App Identifier COMENTAR SEGUN REQUIERA-->
+		<!--Android-->
+		<!--<ApplicationId>com.companyname.appvendedores2024</ApplicationId>-->
+		<!-- antes estaba en minúsculas -->
+		 <!--<applicationid>com.companyname.appvendedores2024</applicationid>-->
+		<!--iOS-->
+		<ApplicationId>com.empresademo.appvendedores2025demo</ApplicationId>
+
+		<!--<ApplicationIdGuid>bdca61f4-7fd1-4ff8-94d8-1bbfscc410afas4</ApplicationIdGuid>-->
+
+		<!-- Versions -->
+		<ApplicationDisplayVersion>9.5</ApplicationDisplayVersion>
+		<!--<ApplicationVersion>1</ApplicationVersion>-->
+		<ApplicationVersion>135</ApplicationVersion>
+
+		<!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->
+		<WindowsPackageType>None</WindowsPackageType>
+
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">24.0</SupportedOSPlatformVersion>
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
+		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'tizen'">6.5</SupportedOSPlatformVersion>
+	</PropertyGroup>
+
+	<!--<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net9.0-android|AnyCPU'">
+		<AndroidPackageFormat>apk</AndroidPackageFormat>
+		<AndroidUseAapt2>True</AndroidUseAapt2>
+		<AndroidCreatePackagePerAbi>False</AndroidCreatePackagePerAbi>
+		<AndroidUseFastDeployment>false</AndroidUseFastDeployment>
+	</PropertyGroup>-->
+
+	<!-- Release | Android SIN AOT -->
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)'=='Release|net9.0-android'">
+		<RunAOTCompilation>false</RunAOTCompilation>
+		<PublishTrimmed>false</PublishTrimmed>
+		<!-- Si el linker te había fallado, mantenelo apagado -->
+		<AndroidLinkMode>None</AndroidLinkMode>
+		<AndroidPackageFormat>aab</AndroidPackageFormat>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net9.0-android|AnyCPU'">
+		<EmbedAssembliesIntoApk>True</EmbedAssembliesIntoApk>
+		<AndroidUseAapt2>True</AndroidUseAapt2>
+		<AndroidCreatePackagePerAbi>False</AndroidCreatePackagePerAbi>
+		<AndroidPackageFormat>apk</AndroidPackageFormat>
+	</PropertyGroup>
+
+	<!-- SOLO ANDROID -->
+	<!-- <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+		<RuntimeIdentifiers>android-arm;android-arm64;android-x64</RuntimeIdentifiers>
+		<AndroidSupportedAbis>armeabi-v7a;arm64-v8a</AndroidSupportedAbis>
+	</PropertyGroup>-->
+
+	<!-- ============ ANDROID ============ -->
+
+	<!-- DEBUG: incluir TODAS las ABIs (emuladores x86/x64 y devices ARM) -->
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)'=='Debug|net9.0-android'">
+		<!-- Variante moderna con RIDs -->
+		<RuntimeIdentifiers>android-arm;android-arm64;android-x64;android-x86</RuntimeIdentifiers>
+		<!-- (Alternativa clásica): <AndroidSupportedAbis>armeabi-v7a;arm64-v8a;x86_64;x86</AndroidSupportedAbis> -->
+		<SupportedOSPlatformVersion>21.0</SupportedOSPlatformVersion>
+	</PropertyGroup>
+
+	<!-- RELEASE: sólo ARM para reducir tamaño del AAB/APK -->
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)'=='Release|net9.0-android'">
+		<AndroidPackageFormat>aab</AndroidPackageFormat>
+		<RuntimeIdentifiers>android-arm;android-arm64</RuntimeIdentifiers>
+		<SupportedOSPlatformVersion>21.0</SupportedOSPlatformVersion>
+	</PropertyGroup>
+
+	<!-- iOS Carpetas requeridas para Release (generación de .ipa) -->
+	<Target Name="EnsureLinkedDirs" BeforeTargets="BeforeBuild;BeforeCompile;ILLink;_CompileToNative;CoreCompile" Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
+		<MakeDir Directories="obj\Release\net9.0-ios\ios-arm64\linked\" ContinueOnError="true" />
+		<MakeDir Directories="$(IntermediateOutputPath)linked\" ContinueOnError="true" />
+		<MakeDir Directories="$(IntermediateOutputPath)$(RuntimeIdentifier)\linked" Condition="'$(RuntimeIdentifier)'!=''" ContinueOnError="true" />
+	</Target>
+
+	<Target Name="EnsureStaticWebAssetsDirs" BeforeTargets="GenerateStaticWebAssetsPropsFile" Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
+		<MakeDir Directories="$(IntermediateOutputPath)$(RuntimeIdentifier)\staticwebassets" />
+		<MakeDir Directories="$(IntermediateOutputPath)staticwebassets" />
+	</Target>
+
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)'=='Release|net9.0-ios'">
+		<MtouchLink>None</MtouchLink>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<!-- App Icon -->
+		<!--<MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" />-->
+		<!--<MauiIcon Include="Resources\AppIcon\icondistri - Copia.png" />-->
+		<MauiIcon Include="Resources\AppIcon\appicon.png" Color="#FFFFFF" />
+
+		<!-- Splash Screen -->
+		<MauiSplashImage Include="Resources\AppIcon\icondistri.png" Color="#FFFFFF" BaseSize="128,128" />
+		<!--<MauiSplashScreen Include="Resources\Splash\splash.png" />-->
+
+		<!-- Images -->
+		<MauiImage Include="Resources\Images\*" />
+		<MauiImage Update="Resources\Images\dotnet_bot.svg" BaseSize="168,208" />
+		<MauiFont Include="Resources\Fonts\*" />
+
+		<!-- Raw Assets (also remove the "Resources\Raw" prefix) -->
+		<MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Compile Remove="Platforms\Android\ForegroundServiceFlete.cs" />
+		<Compile Remove="Platforms\iOS\LocationService.cs" />
+		<Compile Remove="Platforms\iOS\NotificationService.cs" />
+		<Compile Remove="Services\BackgroundTaskService.cs" />
+		<Compile Remove="Services\LocationService.cs" />
+		<Compile Remove="Services\VerificadorSincronizacion.cs" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Blazored.SessionStorage" Version="2.4.0" />
+		<PackageReference Include="FuzzySharp" Version="2.0.2" />
+		<PackageReference Include="mercadopago-sdk" Version="2.8.0" />
+		<PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="9.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Localization" Version="9.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Localization.Abstractions" Version="9.0.0" />
+		<!--<PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />-->
+		<PackageReference Include="Microsoft.Maui.Controls" Version="9.0.110" />
+		<PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="9.0.110" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.0" />
+		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+		<!-- Antes venía transitivamente de EntidadesDesarrollo/EntidadesAppVendedores (proyectos externos). -->
+		<PackageReference Include="sqlite-net-pcl" Version="1.9.172" />
+	</ItemGroup>
+
+	<!-- Si tenías Microsoft.CodeAnalysis.CSharp global, quítalo o condicioná -->
+	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
+		<PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" PrivateAssets="all" ExcludeAssets="runtime" />
+		<PackageReference Include="System.Security.Permissions" Version="7.0.0" />
+	</ItemGroup>
+
+	<!--<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
+		<Reference Remove="PureComponents.EntrySet" />
+	</ItemGroup>-->
+
+	<!--<ItemGroup Condition="'$(TargetFrameworkIdentifier)'=='windows' or '$(TargetFrameworkIdentifier)'=='maccatalyst'">
+		<PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
+	</ItemGroup>
+	<ItemGroup Condition="'$(TargetFrameworkIdentifier)'=='android' or '$(TargetFrameworkIdentifier)'=='ios'">
+		<PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" PrivateAssets="all" ExcludeAssets="runtime" />
+		<PackageReference Include="System.Security.Permissions" Version="7.0.0" />
+	</ItemGroup>-->
+
+	<!--<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)'=='Release|net9.0-android'">
+		<AndroidLinkMode>None</AndroidLinkMode>-->
+	<!-- desactiva el linker -->
+	<!-- <PublishTrimmed>false</PublishTrimmed> -->
+	<!-- redundante, pero claro -->
+	<!-- </PropertyGroup>-->
+
+	<ItemGroup>
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Extensions.Http" Version="9.0.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<MauiAsset Include="wwwroot\**" LogicalName="wwwroot\%(RecursiveDir)%(Filename)%(Extension)" />
+	</ItemGroup>
+
+	<ItemGroup>
+	</ItemGroup>
+
+	<ItemGroup>
+		<Compile Update="Resources\Strings\AppResources.Designer.cs">
+			<DesignTime>True</DesignTime>
+			<AutoGen>True</AutoGen>
+			<DependentUpon>AppResources.resx</DependentUpon>
+		</Compile>
+	</ItemGroup>
+
+	<!-- Fuerza el generador de clase tipada para AppResources -->
+	<ItemGroup>
+		<!-- Base: genera clase -->
+		<EmbeddedResource Update="Resources\Strings\AppResources.zh-CN.resx">
+			<SubType>Designer</SubType>
+			<Generator></Generator>
+		</EmbeddedResource>
+		<EmbeddedResource Update="Resources\Strings\AppResources.pt-BR.resx">
+			<SubType>Designer</SubType>
+			<Generator></Generator>
+		</EmbeddedResource>
+		<EmbeddedResource Update="Resources\Strings\AppResources.resx">
+			<Generator>PublicResXFileCodeGenerator</Generator>
+			<LastGenOutput>AppResources.Designer.cs</LastGenOutput>
+		</EmbeddedResource>
+
+		<!-- Satélites: NO generan clase -->
+		<EmbeddedResource Update="Resources\Strings\AppResources.es.resx">
+			<Generator></Generator>
+		</EmbeddedResource>
+		<EmbeddedResource Update="Resources\Strings\AppResources.en.resx">
+			<Generator></Generator>
+		</EmbeddedResource>
+	</ItemGroup>
+
+	<ItemGroup>
+		<MauiImage Include="wwwroot\img\flags\en.png" />
+		<MauiImage Include="wwwroot\img\flags\es.png" />
+		<MauiImage Include="wwwroot\img\flags\ptbr.png" />
+		<MauiImage Include="wwwroot\img\flags\zhcn.png" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Include="wwwroot\img\flags\en.png" />
+		<None Include="wwwroot\img\flags\es.png" />
+		<None Include="wwwroot\img\flags\ptbr.png" />
+		<None Include="wwwroot\img\flags\zhcn.png" />
+	</ItemGroup>
+
+
+	<!-- Guardas: falla si falta la imagen -->
+	<!-- <Target Name="ValidateMauiSplashInputs" BeforeTargets="Build" Condition="'$(TargetFramework)'=='net8.0-ios'">
+		<Error Condition="!Exists('Resources/Splash/splash.svg') AND !Exists('Resources/Splash/splash.png')" Text="Falta Resources/Splash/splash.(svg|png). Agregá el splash para generar el storyboard 'MauiSplash'." />
+	</Target>-->
+</Project>

@@ -1,0 +1,3892 @@
+@page "/vistaProductos"
+@page "/vistaProductos/{subCategoriasEcomItemID:int}"
+@page "/vistaProductos/{subCategoriasEcomItemID:int}/{textoAFiltrar}"
+
+@inherits UtilCompartidas
+@implements IDisposable
+
+@using AppVendedores2025.Services
+@using AppVendedores2025.Shared
+@using EntidadesAppVendedores
+@using Microsoft.AspNetCore.Components.Web
+@using System.Collections.Immutable;
+
+@using MercadoPago.Client.Preference;
+@using MercadoPago.Config;
+@using MercadoPago.Resource.Preference; 
+@using AppVendedores2025.Components.Pages.VistaProductosComponents
+@using AppVendedores2025.Components.Modals
+
+@using System.Diagnostics;
+@using System.Globalization;
+@using Microsoft.JSInterop
+@using System.Text
+@inject IProductoListaItem oProductoListaService
+@inject IJSRuntime JS
+@inject NavigationManager _navigationManager
+@inject ICombosItemService oCombosItemService
+@inject MercadoPagoService PagoService 
+
+
+
+@if (lsProductos == null || EstaCargandoPrimerVez)
+{
+
+	@*  <div class="spinner-container">
+        <!-- Texto arriba -->
+        <div>
+            <span class="distri">Demo</span><span class="sur"> Ventas</span>
+        </div>
+
+        <!-- Spinner -->
+        <div class="spinner"></div>
+
+        <!-- Texto abajo -->
+        <div class="cargando">Cargando</div>
+    </div>
+ *@
+
+	<div id="loader">
+		<br />
+		<i class="fas fa-spinner fa-spin"></i>
+	</div>
+
+	<div id="app">
+		<div class="spinner-container">
+			<!-- Texto arriba -->
+			<div>
+				<span class="distri">Demo</span><span class="sur"> Ventas</span>
+			</div>
+
+			<!-- Spinner -->
+			<div class="spinner"></div>
+
+			<!-- Texto abajo -->
+			<div class="cargando">@AppResources.Cargando</div>
+		</div>
+	</div>
+
+
+}
+else
+{
+
+	<div class="sinmargenes">
+
+			
+		<VistaProductosHeader
+			TextoFiltro="@textoFiltro"
+			CantEnCart="@cantEnCart()"
+			TotalCarrito="@totalCarrito"
+			ClienteItem="@clienteItem"
+			TipoVendedor="@tipoVendedor"
+			ModoTestGps="@ModoTestGps"
+			ListaDeProductosCargada="@listaDeProductosCargada"
+			OnTextoCambiado="SettextoFiltro"
+			OnAbrirCarrito="AbrirModalCarrito"
+			OnOpenCategorias="openCategorias" />
+
+
+	@functions {
+		bool EtiProdDif = false; 
+    }                    
+    @functions {
+    }
+
+   
+
+    <div class="content_c_a1">
+
+        <section id="homebanner">
+
+ @* ACA insertas el menu tipo PedidosYa *@
+        <div  class="mt-3 px-2 px-md-3">
+           <MenuCategorias
+			Categorias="lsCategorias"
+			Loading="_loadingCategorias"
+			MaxItems="10"
+			IconPx="96"
+			CardMaxWidthPx="200"
+			OnSeleccionarCategoria="OnCategoriaSeleccionadaAsync" />
+        </div>
+           @* <div class="carouselP">
+                  <div class="slidesP">
+                    <img src="https://cdn.empresademo.example/CatalogoEcom/ba200.jpg" alt="slide image" class="slideP">
+                    <img src="https://cdn.empresademo.example/CatalogoEcom/ba201.jpg" alt="slide image" class="slideP">
+                    <img src="https://cdn.empresademo.example/CatalogoEcom/ba202.jpg" alt="slide image" class="slideP">
+                  </div>
+
+               </div> 
+
+               <div id="containerCarrusel">
+                  <div id="slider-container" class="carousel pointer-event slide">
+                    <span onclick="slideRight()" class="btn"> <i class="bi bi-chevron-left"></i></span>
+                        <div id="slider">
+
+
+                          @foreach (var itCombo in lsProdDif.Take(10)) //HACK: cambio de 15 a 10
+
+							{                          
+								<div class="slide">
+									<div class="card cardHome"   @onclick="(args)=> AbrirModalProducto(itCombo.ProductosID)"> 
+
+
+										<div class="card-body text-center">
+
+
+										</div>
+										<div class="divImg" >
+											<img src="/img/dif3.gif" class="card-img-top" alt="..." style="background-image:url(@itCombo.ImagenWeb); background-repeat: no-repeat;" >                          
+										</div>
+										<h2 class="titleProd negrita">@itCombo.Nombre</h2>
+
+									</div>
+								</div>                
+							} 
+
+						</div> 
+						<span onclick="slideLeft()" class="btn"> <i class="bi bi-chevron-right"></i> </span>
+					</div>
+				</div> *@ 	  
+
+
+			</section>
+
+		</div>
+
+
+
+		@*carrito modal*@
+		<ModalCarrito
+			CartView="@cartview"
+			CartViewCombos="@cartviewCombos"
+			TotalCarrito="@totalCarrito"
+			TotalCarritoFinal="@totalCarritoFinal"
+			TotalCarritoNeto="@totalCarritoNeto"
+			ListaPercepcionesCalculadas="@listaPercepcionesCalculadas"
+			TipoVendedor="@tipoVendedor"
+			ListaaUsar="@listaaUsar"
+			DiasDisponibles="@diasDisponibles"
+			NombreBoton="@nombreBoton"
+			IsModalVisible="@isModalVisible"
+			Progress="@progress"
+			OnBorrarCart="(id) => BorrarCart(clienteID)"
+			OnBorrarProducto="(id) => BorrarProductodelCarrito(id, JS)"
+			OnBorrarCombo="(id) => BorrarCombodelCArritoxClienteID(null, id)"
+			OnActualizarCantidad="(t) => ActualizarCantidadCarrito(t.Item1, t.Item2, t.Item3, listaaUsar)"
+			OnActualizarDia="ActualizarDia"
+			OnTransmitir="(t) => Transmitir(t.Item1, t.Item2)"
+			OnSincronizarYTransmitir="SincronizarYTransmitir"
+			OnAbrirProducto="AbrirModalProducto"
+			OnCloseModal="CloseModal" />
+
+
+		<!-- listado de productos-->
+
+		@if (mostrarSelect)
+		{
+			<div class="vp-filters">
+				<select class="vp-filter-select" id="selectOrder" name="selectOrder" @onchange="(args)=> SeleccionarOrden(args)">
+					<option selected value=0>@AppResources.MayorVenta</option>
+					<option value=10>@AppResources.PreciosModificados</option>
+					<option value=6>@AppResources.UltimasUnidades</option>
+					<option value=5>@((MarkupString)AppResources.IngresosRecientes)</option>
+					<option value=8>@AppResources.ProductosNuevos</option>
+					<option value=9>@AppResources.ProductosDestacados</option>
+					<option value=7>@AppResources.CombosOfertas</option>
+					<option value=2>@AppResources.MenorPrecio</option>
+					<option value=3>@AppResources.MayorPrecio</option>
+					<option value=4>A - Z</option>
+				</select>
+				<select class="vp-filter-select" id="selectOrderMarca" name="selectOrderMarca" @onchange="(args)=> SeleccionarMarca(args)">
+					<option selected value="Todos">@AppResources.BuscarMarcas</option>
+					<option value="Todos">Todos</option>
+					@foreach (var it in lsMarcas)
+					{
+						<option value=@it>@it</option>
+					}
+				</select>
+			</div>
+		}
+
+
+
+		<div class="vp-grid">
+			<div class="row g-2 m-0">
+				@foreach (ProductoListaItem it in lsProductos.Where(s => s.PrecioUnitarioFinal(listaaUsar) > 0 || s.Nombre.StartsWith("*")).Take(_displayedCount))
+				{
+					var urlImagenWeb = "";
+					@if (it.ProductosID < 0 && it.ImagenWeb == "-10")
+					{
+						string ImagenCombo = imagenExternaParaCombo(it.ProductosID);
+						urlImagenWeb = ImagenCombo;
+					}
+					else
+					{
+						urlImagenWeb = it.ImagenWeb;
+					}
+
+					@if (_tituloSeccion.TryGetValue(it.ProductosID, out var tituloSec))
+					{
+						<div class="col-12">
+							<div class="vp-seccion-header">@tituloSec</div>
+						</div>
+					}
+
+					<div class="col-6 p-1" @key="it.ProductosID">
+						<div class="vp-card" @onclick="@(() => AbrirModalProducto(@it.ProductosID))">
+
+							<!-- Imagen + badges -->
+							<div class="vp-card-img-wrap">
+								<img class="vp-card-img" src="@urlImagenWeb" alt="@it.Nombre" />
+
+								@{ EtiProdDif = _todasComisionesSonVerdaderas; }
+								<div class="vp-badges">
+									@if (!EtiProdDif)
+									{
+										@if (it.StockEnUnidades > 0 && it.StockEnUnidades <= 10 && it.ProductosID > 0)
+										{
+											<span class="vp-badge vp-badge-yellow">@AppResources.UltimasUnidades</span>
+										}
+										@if (it.DiasDePrecioModificado > 0 && it.DiasDePrecioModificado < 8 && it.ProductosID > 0)
+										{
+											<span class="vp-badge vp-badge-blue">@((MarkupString)AppResources.PrecioModificado)</span>
+										}
+										@if (it.NuevaIncorporacoin && it.ProductosID > 0)
+										{
+											<span class="vp-badge vp-badge-green">@((MarkupString)AppResources.ProductoNuevo)</span>
+										}
+										@if (it.IngresosRecientes && it.ProductosID > 0)
+										{
+											<span class="vp-badge vp-badge-purple">@((MarkupString)AppResources.IngresosRecientes)</span>
+										}
+										@if (it.ProductosID < 0)
+										{
+											<span class="vp-badge vp-badge-red">@((MarkupString)AppResources.OfertaCombo)</span>
+										}
+									}
+									else
+									{
+										<span class="vp-badge vp-badge-orange">@((MarkupString)AppResources.ProductoDestacado)</span>
+									}
+								</div>
+
+								@if (it.StockEnUnidades < 1 && it.ProductosID > 0)
+								{
+									<div class="vp-sinstock-banner">@AppResources.SinStock</div>
+								}
+							</div>
+
+							<!-- Tag combo -->
+							@if (HayCombos(it))
+							{
+								<div class="vp-combo-tag">
+									<i class="bi-gift-fill"></i>
+									@AppResources.Combo.ToUpper()
+								</div>
+							}
+
+							<!-- Nombre + precio -->
+							<div class="vp-card-info">
+								<p class="vp-card-name">@it.Nombre <span class="session-watermark-inline">@vendedor</span></p>
+								@if (it.ProductosID > 0)
+								{
+									@if (TieneDescuentoCombo(it))
+									{
+										<div class="vp-card-bottom vp-card-bottom--combo">
+											<div class="vp-price-group">
+												<span class="vp-card-price-original">$&nbsp;@it.PrecioUnitarioFinal(listaaUsar)</span>
+												<span class="vp-card-price-combo">$&nbsp;@ObtenerTextoPrecioCombo(it)</span>
+											</div>
+											<span class="vp-card-buy vp-card-buy--slim">@AppResources.Comprar</span>
+										</div>
+									}
+									else
+									{
+										<div class="vp-card-bottom">
+											<span class="vp-card-price">$&nbsp;@it.PrecioUnitarioFinal(listaaUsar)</span>
+											<span class="vp-card-buy">@AppResources.Comprar</span>
+										</div>
+									}
+								}
+							</div>
+
+						</div>
+					</div>
+				}
+				@if (_cargandoMas)
+				{
+					<div class="col-12 text-center p-3">
+						<i class="fas fa-spinner fa-spin"></i>
+					</div>
+				}
+				<div id="infinite-scroll-sentinel" style="height:1px;width:100%;"></div>
+				@{
+					listaDeProductosCargada = true;
+				}
+			</div>
+		</div>
+
+
+
+
+		<!--  Modal de producto -->
+		<ModalProductoDetalle
+			ProdInfoModal="@prodInfoModal"
+			ListaaUsar="@listaaUsar"
+			CantidadProductoModal="@cantidadProductoModal"
+			TipoVendedor="@tipoVendedor"
+			TipoVD="@oParam.tipoVD"
+			CFenCliente="@CFenCliente"
+			Cf="@cf"
+			BultoV2="@bultoV2"
+			ClienteMCE="@clienteItem.cli_MCE"
+			TextoVD="@textoVD"
+			Combos="@GetCombosDelProducto(prodInfoModal)"
+			MejorPrecioComboTexto="@_mejorPrecioComboModal"
+			PreciosConCargoCombo="@_preciosConCargoModal"
+			OnCantidadChanged="ModificarCantidadProducto"
+			OnCambiarLista="CambiarLista"
+			OnChangeCF="(t) => ChangeCF(t.Item1, t.Item2)"
+			OnChangeBulto="(t) => ChangeBulto(t.Item1, t.Item2)"
+			OnAgregarCarrito="(p) => ActualizarCantidadCarrito(null, p, 0, listaaUsar)"
+			OnAbrirCombo="AbrirModalProducto" />
+		<!-- fin  modal producto-->
+
+
+		<div class="vp-bottom-nav">
+			<a class="vp-nav-item vp-nav-heart @(botonActivo == "btn1" ? "active" : "")" @onclick="@(() => { botonActivo = "btn1"; LoQmasMeGusta(); JS.InvokeVoidAsync("resetSelect"); })">
+				<i class="bi-heart-fill"></i>
+				<span>Me gusta</span>
+			</a>
+			<a class="vp-nav-item vp-nav-fire @(botonActivo == "btn2" ? "active" : "")" @onclick="@(() => { botonActivo = "btn2"; LoMasPedido(); JS.InvokeVoidAsync("resetSelect"); })">
+				<i class="bi-fire"></i>
+				<span>Más vendido</span>
+			</a>
+			<a class="vp-nav-item vp-nav-catalog @(botonActivo == "btn5" ? "active" : "")" @onclick="@(() => { botonActivo = "btn5"; Catalogo(); JS.InvokeVoidAsync("resetSelect"); })">
+				<i class="bi-grid-3x3-gap-fill"></i>
+				<span>Catálogo</span>
+			</a>
+			<a class="vp-nav-item vp-nav-new @(botonActivo == "btn3" ? "active" : "")" @onclick="@(() => { botonActivo = "btn3"; NuevosIngresos(); JS.InvokeVoidAsync("resetSelect"); })">
+				<i class="bi-lightning-fill"></i>
+				<span>Nuevos</span>
+			</a>
+			<a href="@urlVendedor" class="vp-nav-item vp-nav-user">
+				<i class="bi-person-fill"></i>
+				<span>Mi cuenta</span>
+			</a>
+		</div>
+
+
+		@* @((botonActivo == "btn4") ? "boton_menu2 active" : "")" onclick="@(() => { botonActivo = "btn4"; FiltrarCombos(); })" *@
+
+
+		<ModalComboDetalle
+			comboidActual="@comboidActual"
+			ComboHeadItem="@comboHeadItem"
+			LsProductosCC="@lsProductosCC"
+			LsProductosSC="@lsProductosSC"
+			CantidadDeCombo="@cantidadDeCombo"
+			MsgErrorCombo="@msgErrorCombo"
+			ListaaUsar="@listaaUsar"
+			TipoVendedor="@tipoVendedor"
+			TipoVD="@oParam.tipoVD"
+			CFenCliente="@CFenCliente"
+			Cf="@cf"
+			ClienteMCE="@clienteItem.cli_MCE"
+			OnCantidadCombos="(t) => CantidadDeCombos(t.Item1, t.Item2)"
+			OnActualizarCantidadCC="(t) => ActualizarCantidadCarritoCombos(t.Item1, t.Item2, t.Item3)"
+			OnCambiarLista="CambiarLista"
+			OnChangeCF="(t) => ChangeCF(t.Item1, t.Item2)"
+			OnCerrarCombo="CerrarCombo" />
+
+		<!--Footer Logo -->
+		@* <section>
+			<div style="display:flex; justify-content:center; padding: 24px 0 8px;">
+				<img src="/img/logo.gif" height="80" width="80" style="opacity:0.5;" />
+			</div>
+		</section> *@
+
+	</div>
+
+
+	@*     <a class="btn-back"  @onclick="(args)=>BotonAtrasMigajas(args)"></a>*@
+
+	<ModalActualizacionObligatoria
+		Open="@_modalActualizacionOpen"
+		Mensaje="@(_versionInfo?.Mensaje ?? "Para continuar usando la aplicación, debés actualizarla.")"
+		LinkAndroid="@(_versionInfo?.LinkAndroid ?? "")"
+		LinkIos="@(_versionInfo?.LinkIos ?? "")" />
+
+}
+
+@code {
+	[Parameter]
+	public int subCategoriasEcomItemID { get; set; }
+	[Parameter]
+	public string textoAFiltrar { get; set; } = "";
+
+	[Inject]
+	private NavigationManager NavigationManager { get; set; }
+
+	private List<ProductoListaItem> lsProductos { get; set; } = new List<ProductoListaItem>();
+	private List<ProductoListaItem> lsProductosBack = new List<ProductoListaItem>();
+	private List<ProductoListaItem> lsCombosProducto = new List<ProductoListaItem>();
+	private Dictionary<int, string> _tituloSeccion = new();
+
+	private bool EsVisible(ProductoListaItem p) =>
+		p.PrecioUnitarioFinal(listaaUsar) > 0 || p.Nombre.StartsWith("*");
+
+	private void MarcarLimiteSeccion(List<ProductoListaItem> seccion, string titulo)
+	{
+		var primero = seccion.FirstOrDefault(EsVisible);
+		if (primero != null) _tituloSeccion[primero.ProductosID] = titulo;
+	}
+
+	private async Task<List<ProductoListaItem>> CargarSeccionesLoQmasMeGusta(int cliID, List<ProductoListaItem> todos, int color)
+	{
+		_tituloSeccion.Clear();
+		var lsFavoritos = await GetLoQmasMeGusta(cliID, todos, color);
+		var lsMasPedido = await oProductoListaService.GetLoMasPedidoService(JS, lsProductosItemsTT, color);
+		var idsFavoritos = new HashSet<int>(lsFavoritos.Select(p => p.ProductosID));
+		var lsMasPedidoNuevos = lsMasPedido.Where(p => !idsFavoritos.Contains(p.ProductosID)).ToList();
+		var idsDestacados = new HashSet<int>(idsFavoritos.Concat(lsMasPedidoNuevos.Select(p => p.ProductosID)));
+		var lsResto = todos.Where(p => !idsDestacados.Contains(p.ProductosID) && (color == 0 || p.Color == color || p.Color == 0)).ToList();
+		var merged = new List<ProductoListaItem>(lsFavoritos.Count + lsMasPedidoNuevos.Count + lsResto.Count);
+		merged.AddRange(lsFavoritos);
+		if (lsMasPedidoNuevos.Any()) { MarcarLimiteSeccion(lsMasPedidoNuevos, "Lo más pedido"); merged.AddRange(lsMasPedidoNuevos); }
+		if (lsResto.Any()) { MarcarLimiteSeccion(lsResto, "Otros productos"); merged.AddRange(lsResto); }
+		return merged;
+	}
+
+	private async Task<List<ProductoListaItem>> CargarSeccionesLoMasPedido(int color)
+	{
+		_tituloSeccion.Clear();
+		var lsMasPedido = await oProductoListaService.GetLoMasPedidoService(JS, lsProductosItemsTT, color);
+		var idsMasPedido = new HashSet<int>(lsMasPedido.Select(p => p.ProductosID));
+		var lsResto = lsProductosTT.Where(p => !idsMasPedido.Contains(p.ProductosID) && (color == 0 || p.Color == color || p.Color == 0)).ToList();
+		var merged = new List<ProductoListaItem>(lsMasPedido.Count + lsResto.Count);
+		merged.AddRange(lsMasPedido);
+		if (lsResto.Any()) { MarcarLimiteSeccion(lsResto, "Otros productos"); merged.AddRange(lsResto); }
+		return merged;
+	}
+
+	// Variable para almacenar el valor actual
+	private int cantidadActual;
+
+	//public string nombreDelCombo { get; set; }
+	//lista comentada
+	//private List<ProductoListaItem> lsCombosCarrousel = new List<ProductoListaItem>();
+
+	//Nueva Lista para el carrusell
+	private List<ProductoListaItem> lsProdDif = new List<ProductoListaItem>();
+	//Nueva Lista para productos Nuevos
+	private List<ProductoListaItem> lsProdNuevos = new List<ProductoListaItem>();
+
+	private ClienteItem clienteItem = new ClienteItem();
+	GPSService oGPS = new GPSService();
+	public int respuestaSemaforo;
+	private List<ProductoListaItem> lsProductosTT = new List<ProductoListaItem>();
+	// Lista inmutable
+
+	private List<ProductoListaItem> lsProductosTTDelCliente = new List<ProductoListaItem>();
+
+	Ubicacion posvd = new Ubicacion();
+
+    private bool _loadingCategorias;
+    private string? _error;
+    private bool _modalActualizacionOpen = false;
+    private AppVersionDto? _versionInfo = null;
+	public List<CombosEnUnProductoItem> GetCombosDelProducto(ProductoListaItem productoListaItem)
+	{
+		return lsProductosItemsTT.GetProductoListaCombos(productoListaItem);
+	}
+
+	private Dictionary<int, List<CombosProductosItem>> _comboPreciosLookup = new();
+	private string _mejorPrecioComboModal = "";
+	private Dictionary<int, string> _preciosConCargoModal = new();
+
+	private async Task ValidarVersionAppAsync()
+	{
+		try
+		{
+			var service = new AppVersionService();
+			var info = await service.GetVersionRequeridaAsync();
+			if (info == null) return;
+
+			_versionInfo = info;
+
+			if (!int.TryParse(oParam.VersionApp, out int buildInstalado)) return;
+			if (!int.TryParse(info.VersionMinima, out int buildMinimo)) return;
+
+			if (buildInstalado < buildMinimo && info.ActualizacionObligatoria)
+			{
+				_modalActualizacionOpen = true;
+				await InvokeAsync(StateHasChanged);
+			}
+		}
+		catch (Exception ex)
+		{
+			Console.Error.WriteLine($"[VistaProductos.ValidarVersionAppAsync] {ex.Message}");
+		}
+	}
+
+	// Pre-carga en inicio: para cada combo del cliente, trae sus CombosProductosItem (ya con TextoPrecioCalculado1..8)
+	private async Task PreCargarPreciosCombos()
+	{
+		try
+		{
+			_comboPreciosLookup.Clear();
+			CombosItemService oCombosItemServiceLocal = new CombosItemService();
+
+			var uniqueComboIds = lsProductosTT
+				.Where(p => p.LstComboCliente != null && p.LstComboCliente.Any())
+				.SelectMany(p => p.LstComboCliente.Select(c => c.CombosID))
+				.Distinct()
+				.ToList();
+
+			foreach (var comboId in uniqueComboIds)
+			{
+				try
+				{
+					var lsProdCombo = await oCombosItemServiceLocal.GetProductosByID(comboId);
+					foreach (var cpItem in lsProdCombo)
+					{
+						var pid = cpItem.ComboProductoID;
+						if (!_comboPreciosLookup.ContainsKey(pid))
+							_comboPreciosLookup[pid] = new List<CombosProductosItem>();
+						_comboPreciosLookup[pid].Add(cpItem);
+					}
+				}
+				catch { }
+			}
+		}
+		catch { }
+	}
+
+	// Devuelve el texto de precio combo para el listaaUsar actual desde CombosProductosItem
+	private string GetTextoPrecioFromCombosItem(CombosProductosItem cpItem) => listaaUsar switch
+	{
+		1 => cpItem.TextoPrecioCalculado1,
+		3 => cpItem.TextoPrecioCalculado3,
+		5 => cpItem.TextoPrecioCalculado5,
+		6 => cpItem.TextoPrecioCalculado6,
+		4 => cpItem.TextoPrecioCalculado4,
+		7 => cpItem.TextoPrecioCalculado7,
+		_ => cpItem.TextoPrecioCalculado1
+	};
+
+	// Parsea un texto de precio combo a decimal
+	private decimal ParsearTextoComboPrecio(string texto)
+	{
+		if (string.IsNullOrWhiteSpace(texto)) return decimal.MaxValue;
+		texto = texto.Trim().Replace(".", "").Replace(",", ".");
+		return decimal.TryParse(texto, NumberStyles.Any, CultureInfo.InvariantCulture, out var v) ? v : decimal.MaxValue;
+	}
+
+	// Obtiene el texto del precio combo más bajo para el producto dado (para mostrar en tarjeta)
+	private string ObtenerTextoPrecioCombo(ProductoListaItem it)
+	{
+		try
+		{
+			if (_comboPreciosLookup.TryGetValue(it.ProductosID, out var items))
+			{
+				var mejor = items
+					.OrderBy(cp => ParsearTextoComboPrecio(GetTextoPrecioFromCombosItem(cp)))
+					.FirstOrDefault();
+				if (mejor != null)
+				{
+					var texto = GetTextoPrecioFromCombosItem(mejor);
+					if (!string.IsNullOrWhiteSpace(texto)) return texto;
+				}
+			}
+			return it.TextoCombo(listaaUsar) ?? string.Empty;
+		}
+		catch { return string.Empty; }
+	}
+
+	// Replica ClassPrecio de ModalComboDetalle usando el lookup pre-cargado
+	private bool TieneDescuentoCombo(ProductoListaItem it)
+	{
+		try
+		{
+			if (!HayCombos(it)) return false;
+
+			var textoCombo = ObtenerTextoPrecioCombo(it);
+			if (string.IsNullOrWhiteSpace(textoCombo)) return false;
+
+			// Verificar que no es N/Calc sin descuento
+			if (_comboPreciosLookup.TryGetValue(it.ProductosID, out var items))
+			{
+				var mejor = items
+					.OrderBy(cp => ParsearTextoComboPrecio(GetTextoPrecioFromCombosItem(cp)))
+					.FirstOrDefault();
+				if (mejor?.PrecioNoCalculado == "N/Calc") return false;
+			}
+			else if (it.PrecioNoCalculado == "N/Calc" && it.PorcentajDescuento1 == 0)
+			{
+				return false;
+			}
+
+			var precioCombo = ParsearTextoComboPrecio(textoCombo);
+			if (precioCombo == decimal.MaxValue || precioCombo <= 0) return false;
+
+			var precioNormal = it.PrecioUnitarioFinal(listaaUsar);
+			return Math.Abs(precioNormal - precioCombo) >= 0.30M;
+		}
+		catch { return false; }
+	}
+
+	private bool HayCombos(ProductoListaItem productoListaItem)
+	{
+
+		// ProductoListaItems lsProductosItemsTT=new ProductoListaItems();
+		//    lsProductosItemsTT.AddRange(lsProductosTT);
+		return lsProductosItemsTT.HayCombos(productoListaItem);
+
+
+
+		// if (productoListaItem.HayCombo.HasValue)
+		// {
+		//     return  productoListaItem.HayCombo.Value;
+		// }
+		// if (productoListaItem.LstComboCliente.Count>0)
+		// {
+		//     productoListaItem.HayCombo = true;
+		//     return true;
+		// }
+		// var padreHijoItem=GetProductoListaItemPadre(productoListaItem);
+		// if (padreHijoItem!=null)
+		// {
+		//     if (padreHijoItem.LstComboCliente.Count>0)
+		//     {
+		//         productoListaItem.HayCombo = true;
+
+		//         return true;             
+		//     }
+
+		// }
+		// productoListaItem.HayCombo = false; 
+
+		// return false;
+
+	}
+
+	private ProductoListaItems lsProductosItemsTT => _lsProductosItemsTTCache;
+
+	private void ActualizarCacheProductos()
+	{
+		_lsProductosItemsTTCache = new ProductoListaItems();
+		_lsProductosItemsTTCache.AddRange(lsProductosTT);
+		_todasComisionesSonVerdaderas = lsProductos.All(p => p.ComisionDiferencial);
+		_displayedCount = _pageSize;
+	}
+
+	[JSInvokable]
+	public async Task CargarMasProductos()
+	{
+		if (_cargandoMas) return;
+		var total = lsProductos.Count(s => s.PrecioUnitarioFinal(listaaUsar) > 0 || s.Nombre.StartsWith("*"));
+		if (_displayedCount >= total) return;
+
+		_cargandoMas = true;
+		await InvokeAsync(StateHasChanged);
+		await Task.Delay(50);
+		_displayedCount = Math.Min(_displayedCount + _pageSize, total);
+		_cargandoMas = false;
+		await InvokeAsync(StateHasChanged);
+	}
+
+	public void Dispose()
+	{
+		_dotNetRef?.Dispose();
+		try { JS.InvokeVoidAsync("destroyInfiniteScroll"); } catch { }
+	}
+
+	// maxi
+	ParametrosServices oParam = new ParametrosServices();
+	List<Percepciones> listaPercepcionesCalculadas = new List<Percepciones>(); // Lista para almacenar percepciones calculadas
+	bool ModoTestGps;
+	private List<CombosXClientesItem> lsCombosXCliOrdenados = new List<CombosXClientesItem>();
+	public List<PedidosDetalleItem> cart = new List<PedidosDetalleItem>();
+	private List<ProductoListaItem> cartview = new List<ProductoListaItem>();
+	private List<ProductoListaItem> cartviewCombos = new List<ProductoListaItem>();
+	private decimal faltaArrastre = 0;
+	private List<CategoriaItem> lsCategorias = new List<CategoriaItem>();
+	private List<SubCategoriasApiEcomItem> lsSubCategorias = new List<SubCategoriasApiEcomItem>();
+	private List<SubCategoriasApiEcomItem> lsSubCategoriasElegida = new List<SubCategoriasApiEcomItem>();
+
+	string version;
+	private List<string> lsMarcas = new List<string>();
+	string MarcaSeleccionada = "";
+	int ulitmaSubcatElegida = 0;
+
+	// Modal de progress bar
+	private bool isModalVisible = false;  // Controla la visibilidad del modal
+	private int progress = 0;  // Controla el progreso de la barra de progreso (de 0 a 100)
+	private bool respPagoRecibido = false;  // Variable para saber si la respuesta del pago ya fue recibida
+
+
+	/// para combos
+	private List<ProductoListaItem> lsProductosCC = new List<ProductoListaItem>();
+	private List<ProductoListaItem> lsProductosSC = new List<ProductoListaItem>();
+	CombosHeadItem comboHeadItem = new CombosHeadItem();
+	PedidoCabeceraService oPedidoCabeceraService = new PedidoCabeceraService();
+	ProductosSubCategoriasService oProductosSubCategoriasService = new ProductosSubCategoriasService();
+	CombosxclienteService oCombosxclienteService = new CombosxclienteService();
+	PedidosDetalleItemService oIPedidosDetalleItemService = new PedidosDetalleItemService();
+
+	//cargar los ID de los combos del cliente que esta logueado 23/07/24
+	List<int> lsIDCombosClienteActual = new List<int>();
+	private List<ProductoListaItem> lsProductosClienteActual = new List<ProductoListaItem>();
+
+	// Fecha de pedodo 30-09
+	//public List<DateTime> diasDisponibles;
+	//public List<DateTime> diasDisponibles = new List<DateTime>();
+	public List<DateTime> diasDisponibles = new List<DateTime> { DateTime.Now.AddDays(1) };
+	public DateTime? fechaSeleccionada;
+
+	int clienteID = 0;
+	int pedidoCabeceraId = 0;
+	int listaaUsar = 1;
+	string ListadePreciosNomre = "";
+	decimal totalCarrito = 0;
+	decimal totalCarritoNeto = 0;
+	decimal totalCarritoNetoPercep = 0;
+	decimal totalCarritoFinal = 0;
+	decimal totalCarritoProductos = 0;
+
+	string textoFiltro {get;set;} = string.Empty;
+
+	public string textoFiltroAnterior = "";  // Mantiene el valor anterior
+	bool flagNuevosIngresos = false;
+	//private Stopwatch stopwatch;
+	//private const int DelayMilliseconds = 500;
+	//private System.Threading.Timer timer;
+
+	string imagenData;
+	int OrdenSeleccionado = 0;
+	string vista = "cate";
+	bool estoyretrocediendo = false;
+	//info de modal producto
+	ChangeEventArgs changeEventArgsDeleteCarrito = new ChangeEventArgs();
+
+	ProductoListaItem prodInfoModal = new ProductoListaItem();
+
+	//  Info para modal combos
+	int comboidActual{ get; set; }
+	int cantCC = 0;
+	int cantSC = 0;
+	int cantidadDeCombo = 1;
+	bool linecombo = true;
+	int vendedorID;
+	string msgErrorCombo = "";
+	public string comentario = "";
+	int Color = 0; //todos
+	string vendedor = "";
+	string textoVD = "";
+	bool mostrarSelect = true;
+	/// <summary>
+	//agregado 18-07-24 verifica si tiene CF en el nombre del cliente
+	bool CFenCliente = false;
+	string urlVendedor = "";
+	bool tipoVendedor = false;
+	public string nombreBoton =  "";
+	public string mensajeUltimaTransmisionV2
+	{
+		get
+		{
+			return oParam.MensajeVendedorHead;
+		}
+	}
+
+	public string mensajeSinTransmision
+	{
+		get
+		{
+			return oParam.MensajeVPuntosSinTx;
+		}
+	}
+	public string mensaje;
+
+	public void setCuitStorage()
+	{
+		string cuitValido = "cuitValido";
+		string valor = "1";
+		JS.InvokeVoidAsync("setValidarCuit(cuitValido,1)");
+	}
+
+
+	string botonActivo = "";
+	bool cf = true;
+	bool bultoV2   { get; set; }=false;
+	bool listaDeProductosCargada = false;
+	private int _displayedCount = 30;
+	private const int _pageSize = 30;
+	private bool _cargandoMas = false;
+	private bool _todasComisionesSonVerdaderas = false;
+	private ProductoListaItems _lsProductosItemsTTCache = new ProductoListaItems();
+	private DotNetObjectReference<VistaProductos>? _dotNetRef;
+	private bool _scrollObserverInitialized = false;
+
+
+
+	public class Migajas
+	{
+		public string Lugar { get; set; }
+		public string Valor { get; set; }
+
+	}
+
+	List<Migajas> migajas = new List<Migajas>();
+
+
+	protected async override Task OnAfterRenderAsync(bool firstRender)
+	{
+		try
+		{
+			if (firstRender)
+			{
+				await JS.InvokeAsync<string>("cargarCarousel");
+				oParam.PagePadre = "vistaProductos";
+				ModoTestGps = oParam.ModoTestGps;
+				try
+				{
+					if (tipoVendedor && oParam.ListadePrecios == 7)
+					{
+						nombreBoton = AppResources.RealizarPago;
+					}
+				}
+				catch { }
+			}
+
+			if (!EstaCargandoPrimerVez && !_scrollObserverInitialized)
+			{
+				_scrollObserverInitialized = true;
+				_dotNetRef = DotNetObjectReference.Create(this);
+				await JS.InvokeVoidAsync("initInfiniteScroll", _dotNetRef);
+			}
+		}
+		catch
+		{
+			if (firstRender)
+			{
+				await Task.Delay(3000);
+				try { await JS.InvokeAsync<string>("cargarCarousel"); } catch { }
+			}
+		}
+		//if (firstRender)
+		//{
+		//      // Obtener una referencia a la p?gina y agregar un evento "popstate"
+		////      await JS.InvokeVoidAsync("AppVendedores.initialize", pageRef);
+		//  }
+
+
+	}
+
+
+	//    var aaaa= new AppVendedores.Shared.UtilCompartidas();
+
+	[JSInvokable]
+	public static void HandleBackButton()
+	{
+		// C?digo para manejar el evento del bot?n "back"
+		//   VistaProductos.BotonAtrasMigajas();
+		//   var stop = 0;
+	}
+	private async Task<bool> ChangeCF(ChangeEventArgs e, bool cfs)
+	{
+		cf = cfs;
+
+		if (clienteItem.cli_MCE == 0)
+		{
+			//cf = false;
+			if (clienteItem.CUITValido == 0)
+			{
+				cf = true;
+			}
+			else
+			{
+				cf = false;
+			}
+		}
+
+
+
+		this.StateHasChanged();
+		return cf;
+	}
+	private async Task<bool> ChangeBulto(ChangeEventArgs e, bool b)
+	{
+		bultoV2 = b;
+		this.StateHasChanged();
+		return bultoV2;
+	}
+
+	// public async Task ResetearBultoV2()
+	// {
+	// 	bultoV2 = false;
+	// 	await InvokeAsync(StateHasChanged);
+	// }
+
+	//protected override bool OnBackButtonPressed()
+	//{
+	//    // c?digo personalizado para manejar el evento del bot?n "Back"
+
+	//    return base.OnBackButtonPressed();
+	//}
+
+	//}
+
+	private async Task reactivarCarrito()
+	{
+
+		cartview = await oProductoListaService.LlenarCantidadEnCarrito(clienteID, lsProductosTT);
+		//      totalCarrito = await oProductoListaService.TotalEnCarrito(lsProductosTT);
+		faltaArrastre = await oProductoListaService.EstadoArrastreParaCombos(cartview, cartviewCombos, clienteID);
+
+		cartviewCombos = await GenerarCarritoProductoCombos(clienteID);
+		var totalCarritoCombos = cartviewCombos.Sum(c => c.TotalLinea);
+		totalCarritoProductos = cartview.Sum(c => c.TotalLinea);
+		totalCarrito = totalCarritoProductos + totalCarritoCombos;
+
+		//Cuando es cliente calculamos los Netos segun percepciones antes de trasnmitir el pedido a MP
+		@if (tipoVendedor)
+		{
+			totalCarritoNeto = cartviewCombos.Sum(c => c.TotalLineaNeto);
+			totalCarritoNeto += cartview.Sum(c => c.TotalLineaNeto);
+			ActualizarValorFinalCarrito();
+		}
+		else
+		{
+			totalCarritoFinal = totalCarrito;
+		}
+
+
+		if (cartviewCombos.Count() == 0 && cartview.Count() == 0)
+		{
+			totalCarritoFinal = 0;
+			Traer(100002);
+			await JS.InvokeVoidAsync("cerrarModal");
+
+		}
+	}
+
+	bool EstaCargandoPrimerVez = true;
+
+	protected override async Task OnInitializedAsync()
+	{
+		//ParametrosServices oParam = new ParametrosServices();
+		// await MostrarClaseSemaforo();
+
+		// _timer = new Timer(async _ => await MostrarClaseSemaforo(), null, 0, 1000); // cada 5 segundos
+
+		//stopwatch = new Stopwatch();
+		//timer = new System.Threading.Timer(TriggerSearch, null, Timeout.Infinite, Timeout.Infinite);
+
+		changeEventArgsDeleteCarrito.Value = 0;
+		 _loadingCategorias = true;
+		try
+		{
+
+			nombreBoton = !oParam.EsModoTest ? AppResources.Transmitir + " " + AppResources.Pedidos : AppResources.Transmitir + "" + AppResources.Pedidos + " Test";
+
+			vendedorID = Int32.Parse(oParam.VendedorID);
+			vendedor = oParam.Vendedor;
+			listaaUsar = (int)(oParam.ListadePrecios);
+			ListadePreciosNomre = oParam.listadePreciosNombre;
+			Color = Int32.Parse(oParam.Color);
+			version = oParam.VersionApp;
+			textoVD = oParam.TextoVD;
+		}
+		catch
+		{
+
+		}
+
+		// Fecha de pedido 30-09
+		diasDisponibles = ObtenerDiasDisponibles();
+
+
+
+		await JS.InvokeAsync<string>("ocultarnav");
+		tipoVendedor = oParam.TipoDeUsuario;
+		clienteID = oParam.ClienteID;
+		pedidoCabeceraId = oParam.CabeceraCarritoID;
+		ClienteItemService oClienteItemService = new ClienteItemService();
+		clienteItem = await oClienteItemService.GetByID(clienteID);
+
+		CFenCliente = clienteItem.CUITValido == 0;
+
+		if (!tipoVendedor)
+		{
+			//urlVendedor = oParam.urlDisconsultas + "portalvendedores/menu";
+			urlVendedor = "/";
+		}
+		else
+		{
+			urlVendedor = "/";
+		}
+
+		if (clienteItem.cli_MCE == 0)
+		{
+			//cf = false;
+			if (clienteItem.CUITValido == 0)
+			{
+				cf = true;
+			}
+			else
+			{
+				cf = false;
+			}
+		}
+
+
+		//Traigo todos los productos d
+		lsProductosTT = await oProductoListaService.GetAllFiltradoBloqueados(clienteID, null);
+		_lsProductosItemsTTCache = new ProductoListaItems();
+		_lsProductosItemsTTCache.AddRange(lsProductosTT);
+
+
+		if (oParam.ReactivarCarrito)
+		{
+			// var preparacionCarrito = await oPedidoCabeceraService.PrepararParaReactivacionAsync(oParam.CabeceraCarritoID);
+			var obtenerPedidoReactivado = await oPedidoCabeceraService.GetPedidoCompletoAsync(oParam.CabeceraCarritoID);
+
+
+
+			var itemsSiCombos = obtenerPedidoReactivado.Detalles.Where(c => c.CombosID > 0);
+			var itemsNoCombos = obtenerPedidoReactivado.Detalles.Where(c => c.CombosID == 0);
+
+			// if (itemsNoCombos.Count() > 0)
+			// {
+			// 	foreach (var itC in itemsNoCombos)	   
+			// 	{
+			// 		var productoSelected = lsProductosTT.Where(c  => c.ProductosID == itC.ProductoID).FirstOrDefault();
+			// 		productoSelected.CantidadEnCarrito = itC.Cantidad;
+			// 		productoSelected.CantidadEnCarrito = itC.Cantidad;
+			// 		ActualizarCantidadCarrito(null, productoSelected, 0, listaaUsar);
+			// 	}
+
+			// }
+
+			// if (itemsSiCombos.Count() > 0)
+			// {
+
+
+
+			// 	var agroupCombos = itemsSiCombos.GroupBy(c => c.CombosID).ToList();
+
+			// 	foreach (var grupo in agroupCombos)
+			// 	{
+			// 		var comboId = grupo.Key;
+			// 		var cantCombos = grupo.Sum(x => x.Cantdecombos); // o el c�lculo que corresponda
+
+			// 		try
+			// 		{
+			// 			// comboidActual = itC.CombosID;
+			// 			// TraerCombo(itC.CombosID);
+			// 			// CerrarCombo();
+
+			// 			var resultado = await ValidarYGrabarComboConItemsAsync(comboId, cantCombos, itemsSiCombos.ToList());
+
+			// 			if (!resultado.Exito)
+			// 			{
+			// 				// Pod�s loguear o acumular mensajes de error
+			// 				Console.WriteLine($"Error combo {comboId}: {resultado.Mensaje}");
+			// 			}
+			// 			// var productoSelected = lsProductosTT.Where(c => c.ProductosID == itC.ProductoID).FirstOrDefault();
+			// 			// ActualizarCantidadCarrito(null, productoSelected, 0, listaaUsar);
+			// 		}
+			// 		catch (Exception ex)
+			// 		{
+			// 			Console.WriteLine($"Error inesperado en combo {comboId}: {ex.Message}");
+			// 		}
+			// 	}
+
+
+			// }
+			oParam.ReactivarCarrito = false;
+
+			// lsProductosTT.Add(obtenerPedidoReactivado);
+			// reactivarCarrito();
+		}
+
+
+
+
+
+		//Agregado 07/01/2025
+		//lsProductosTTDelCliente = await oProductoListaService.GetAllFiltradoBloqueados(clienteID,null);
+
+
+		// ///para comentar hasta linea 1320
+		// lsCombosXCliOrdenados = await oCombosxclienteService.GetCombosxClientexCliID(clienteID);
+		// lsCombosXCliOrdenados = lsCombosXCliOrdenados.OrderBy(c => c.Orden).ToList();
+
+		// foreach (var combo in lsCombosXCliOrdenados)
+		// {
+		//     lsIDCombosClienteActual.Add(-(combo.CombosID)); 
+
+		// }
+		// var resultado = lsProductosTT
+		//     .Where(c => c.ProductosID < 0 && lsIDCombosClienteActual.Contains(c.ProductosID))
+		//     .Concat(lsProductosTT.Where(c => c.ProductosID >= 0))
+		//     .ToList();
+
+		// lsProductosTT = resultado;
+
+
+		ProductoListaItem prodcomboencontrado = new ProductoListaItem();
+
+		// foreach (var cxc in lsCombosXCliOrdenados)
+		// {
+
+
+		//     if (Color > 0)
+		//     {
+		//         prodcomboencontrado = lsProductosTT.Where(c => c.ProductosID == -cxc.CombosID && cxc.CategoriaDeCombos == 1 && c.Color == Color ).ToList().FirstOrDefault();
+		//     }
+		//     else
+		//     {
+		//         prodcomboencontrado = lsProductosTT.Where(c => c.ProductosID == -cxc.CombosID && cxc.CategoriaDeCombos == 1 ).ToList().FirstOrDefault();
+		//     }
+
+		//     if (prodcomboencontrado != null)
+		//     {
+		//         lsCombosCarrousel.Add(prodcomboencontrado);
+		//     }
+		// }
+
+
+
+		// foreach (var cxc in lsCombosXCliOrdenados)
+		// {
+
+		//     if (Color > 0)
+		//     {
+		//         prodcomboencontrado = lsProductosTT.Where(c => c.ProductosID == -cxc.CombosID && cxc.CategoriaDeCombos == 2 && c.Color == Color  ).ToList().FirstOrDefault();
+		//     }
+		//     else
+		//     {
+		//         prodcomboencontrado = lsProductosTT.Where(c => c.ProductosID == -cxc.CombosID && cxc.CategoriaDeCombos == 2  ).ToList().FirstOrDefault();
+		//     }
+
+
+		//     var clienteIDActual = clienteID;
+
+		//     if (prodcomboencontrado != null)
+		//     {
+		//         lsCombosCarrousel.Add(prodcomboencontrado);
+		//     }
+		//     //  if (lsCombosCarrousel.Count() >= 15) { break; }
+		//     // int clienteIDActual;
+		//     // foreach (var cxt in lsCombosXCliOrdenados)
+		//     // {   clienteIDActual = cxt.ClientesID;
+		//     //     foreach (var items in lsProductosTT)
+		//     //     if (items.ProductosID < 0)
+		//     //     {   
+		//     //         //prodcomboencontrado = lsProductosTT.Where(c => c.ProductosID == -cxc.CombosID && cxc.CategoriaDeCombos == 2  ).ToList().FirstOrDefault();
+		//     //         lsProductosTT = lsProductosTT.RemoveAll(c=> c.ProductosID == -cxc.CombosID && == clienteID);
+
+		//     //     }
+		//     // }
+		// }
+
+
+		await oCombosItemService.GetNombreCombo(0);
+		await GetCategorias();
+		if (textoAFiltrar is null)
+		{
+			textoAFiltrar = "";
+		}
+		if (textoAFiltrar != "")
+		{
+
+			subCategoriasEcomItemID = 0;
+			textoFiltro = textoAFiltrar;
+
+		}
+		Traer(subCategoriasEcomItemID);
+
+		//Modificado 18/07/24 
+		lsProdDif.Clear();
+
+		//ACTIVAMOS LA FUNCION PARA TRAER LO PRODUCTOS MAS NUEVOS Y ORDENARLOS POR COLOR
+		var lsNuevosProductos = await oProductoListaService.GetNuevosIngresosService(JS, lsProductosTT, Color);
+
+
+		// Iterar sobre lsProductosTT y agregar los ProductosID que cumplen con los criterios
+		foreach (var producto in lsNuevosProductos
+			.ToList()
+			.OrderByDescending(c => c.TotalVenta)
+			.Where(c => c.Color == Color || Color == 0)
+			.Take(5))
+		{
+			lsProdDif.Add(producto);
+			// listaProductosID.Add(producto.ProductosID);
+		}
+
+		foreach (var producto in lsProductosTT
+			.ToList()
+			.OrderByDescending(c => c.DiasDeStockDisponible > 100)
+			.Where(c => (c.Color == Color || Color == 0) && c.DiasDeStockDisponible != 9999 && !c.Nombre.StartsWith("*"))
+			.Take(5))
+		{
+			lsProdDif.Add(producto);
+		}
+
+		await ValidarVersionAppAsync();
+
+		EstaCargandoPrimerVez = false;
+		_ = PreCargarPreciosCombos().ContinueWith(_ => InvokeAsync(StateHasChanged));
+
+		// if (oParam.tipoVD != 5)
+		// {
+
+		// 	TransmitirPuntos();
+
+		// }
+		_loadingCategorias = false;
+	}
+
+	public class ResultadoProcesarCombo
+	{
+		public bool Exito { get; set; }
+		public string Mensaje { get; set; } = string.Empty;
+	}
+
+
+	private async Task<ResultadoProcesarCombo> ValidarYGrabarComboConItemsAsync(
+	int comboId,
+	int cantidadCombo,
+	List<PedidosDetalleItem> productosSeleccionados)
+	{
+		var resultado = new ResultadoProcesarCombo();
+
+		try
+		{
+			if (cantidadCombo <= 0)
+			{
+				resultado.Exito = false;
+				resultado.Mensaje = "La cantidad de combos debe ser mayor a cero.";
+				return resultado;
+			}
+
+			if (productosSeleccionados == null || productosSeleccionados.Count == 0)
+			{
+				resultado.Exito = false;
+				resultado.Mensaje = "No se seleccionaron productos para el combo.";
+				return resultado;
+			}
+
+			// ==== 1) Servicios ====
+			var oProductoItemService = new ProductoListaService();
+			var oCombosItemService = new CombosItemService();
+			var oclienteItemService = new ClienteItemService();
+			// oPedidoCabeceraService lo supongo inyectado (como en tu c�digo actual)
+
+			// ==== 2) Header y definici�n del combo ====
+			var resHeader = await oCombosItemService.GetCombosHeadItem(comboId);
+			if (resHeader == null || resHeader.Count == 0)
+			{
+				resultado.Exito = false;
+				resultado.Mensaje = $"No se encontr� el combo con ID {comboId}.";
+				return resultado;
+			}
+
+			var comboHeadItemLocal = resHeader[0];
+
+			var lsProdCombo = await oCombosItemService.GetProductosByID(comboId);
+			if (lsProdCombo == null || lsProdCombo.Count == 0)
+			{
+				resultado.Exito = false;
+				resultado.Mensaje = $"El combo {comboHeadItemLocal.Codigo} no tiene productos configurados.";
+				return resultado;
+			}
+
+			// Diccionario para validar y obtener datos de configuraci�n por producto
+			var dictConfig = lsProdCombo.ToDictionary(
+				x => x.ComboProductoID,   // ID del producto en el combo
+				x => x
+			);
+
+			// ==== 3) Validar que los seleccionados pertenecen al combo y no superan m�ximos ====
+			var errores = new List<string>();
+
+			foreach (var sel in productosSeleccionados)
+			{
+				// 3.1) �Existe en la definici�n del combo?
+				if (!dictConfig.TryGetValue(sel.ProductoID, out var cfg))
+				{
+					errores.Add($"El producto {sel.ProductoID} no pertenece al combo {comboHeadItemLocal.Codigo}.");
+					continue;
+				}
+
+				// 3.2) Validar ComboTipo (con cargo / sin cargo) si quer�s estricto
+				// if (sel.ComboTipo != cfg.ComboTipo)
+				// {
+				// 	errores.Add($"El producto {sel.ProductoID} tiene un tipo de combo inv�lido.");
+				// }
+
+				// 3.3) M�ximo por producto (basado en CantidadConCargo * cantidadCombo)
+				// Nota: esto asume que CantidadConCargo es la cantidad por combo.
+				var maxPermitido = cfg.CantidadConCargo * cantidadCombo;
+
+				if (maxPermitido > 0 && sel.Cantidad > maxPermitido)
+				{
+					errores.Add(
+						$"Producto {sel.ProductoID}: cantidad {sel.Cantidad} supera el m�ximo permitido ({maxPermitido}) para {cantidadCombo} combos."
+					);
+				}
+
+				// (Opcional) Pod�s validar por grupo sumando todas las l�neas del mismo grupo
+				// y comparando contra CantidadDinamica o similar.
+			}
+
+			if (errores.Count > 0)
+			{
+				resultado.Exito = false;
+				resultado.Mensaje = string.Join(Environment.NewLine, errores);
+				return resultado;
+			}
+
+			// ==== 4) Traer datos del cliente ====
+			var cliDatos = await oclienteItemService.GetByID(clienteID);
+			if (cliDatos == null)
+			{
+				resultado.Exito = false;
+				resultado.Mensaje = "No se encontr� el cliente asociado al pedido.";
+				return resultado;
+			}
+
+			// ==== 5) Borrar combo anterior para ese cliente ====
+			await oPedidoCabeceraService.BorrarByClienteIdyComboIDSinTx(clienteID, comboId);
+
+			// ==== 6) Recorrer productos seleccionados y grabar ====
+			foreach (var sel in productosSeleccionados)
+			{
+				if (sel.Cantidad <= 0)
+					continue;
+
+				if (!dictConfig.TryGetValue(sel.ProductoID, out var cfg))
+					continue; // ya validamos antes, pero por las dudas
+
+				// Traer info de producto de lista (para precios)
+				var prodLista = await oProductoItemService.GetByIdLista(sel.ProductoID);
+				if (prodLista == null)
+					continue;
+
+				// Armamos flags de con / sin cargo
+				bool esConCargo = (cfg.ComboTipo == 0);
+
+				decimal valorFinalCombo = 0m;
+				decimal precioNeto = 0m;
+
+				if (esConCargo)
+				{
+					// ==== 6.1) Producto con cargo: aplicar descuentos ====
+					prodLista.PorcentajDescuento1 = Convert.ToDecimal(cfg.Descuento1);
+					prodLista.PorcentajDescuento2 = Convert.ToDecimal(cfg.Descuento2);
+					prodLista.NroDeGrupoCombo = cfg.NrGrupoDinamico;
+					prodLista.CantidadMaximaPorGrupo = cfg.CantidadConCargo;
+					prodLista.ComboCodigo = comboHeadItemLocal.Codigo;
+
+					var precioLista = prodLista.PrecioUnitarioFinal(listaaUsar);
+					var precioNetoBase = prodLista.PrecioUnitarioNeto(listaaUsar);
+
+					// Descuento 1
+					if (prodLista.PorcentajDescuento1 > 0)
+					{
+						var porcCalculado = (precioLista * prodLista.PorcentajDescuento1) / 100m;
+						precioLista -= porcCalculado;
+					}
+
+					// Descuento 2
+					if (prodLista.PorcentajDescuento2 > 0)
+					{
+						var porcCalculado = (precioLista * prodLista.PorcentajDescuento2) / 100m;
+						precioLista -= porcCalculado;
+					}
+
+					valorFinalCombo = precioLista;
+					precioNeto = precioNetoBase; // pod�s ajustar tambi�n con descuentos si corresponde
+				}
+				else
+				{
+					// ==== 6.2) Producto sin cargo ====
+					prodLista.PrecioUnitarioFinalAlamcene = 0;
+					prodLista.PrecioUnitarioFinalAutoservicio = 0;
+					prodLista.PrecioUnitarioFinalEspecial = 0;
+					prodLista.PrecioUnitarioFinalKiosko = 0;
+					prodLista.NroDeGrupoCombo = cfg.NrGrupoDinamico;
+					prodLista.CantidadMaximaPorGrupo = cfg.CantidadConCargo;
+					prodLista.ComboCodigo = comboHeadItemLocal.Codigo;
+
+					valorFinalCombo = 0;
+					precioNeto = 0;
+				}
+
+				// ==== 6.3) Grabar l�nea del combo en el pedido ====
+				await oPedidoCabeceraService.AgregarPedidosCombo(
+					clienteID,
+					prodLista.ProductosID,
+					sel.Cantidad,                       // cantidad elegida por el usuario
+					listaaUsar,
+					comboId,
+					valorFinalCombo,
+					precioNeto,
+					prodLista.NroDeGrupoCombo,
+					cliDatos.cli_codigo,
+					cliDatos.cli_direccion,
+					prodLista.Nombre,
+					prodLista.CodigoDeProducto,
+					cf,
+					prodLista.UnidadesPorBulto,
+					cantidadCombo,
+					vendedorID,
+					version,
+					prodLista.ComboCodigo
+				);
+			}
+
+			// ==== 7) OK ====
+			resultado.Exito = true;
+			resultado.Mensaje = "Combo guardado correctamente con los productos seleccionados.";
+			return resultado;
+		}
+		catch (Exception ex)
+		{
+			resultado.Exito = false;
+			resultado.Mensaje = $"Error al procesar el combo {comboId}: {ex.Message}";
+			Console.WriteLine(ex.ToString());
+			return resultado;
+		}
+	}
+
+
+	private int CalcularMaximoCombosPosibles(List<CombosProductosItem> lsProdCombo, int cantidadSolicitada)
+	{
+		// Supongo que CombosProductoItem tiene:
+		// - ProductoListaItem.StockEnUnidades
+		// - CantidadConCargo (cantidad por combo)
+		// - ProductoListaItem.UnidadesPorBulto (si aplica)
+		// Ajustalo a tus clases reales
+		int maxPorTodos = int.MaxValue;
+
+		foreach (var i in lsProdCombo.Where(x => x.ComboTipo == 0)) // con cargo
+		{
+			var unidadesNecesariasPorCombo = i.CantidadConCargo * (i.ProductoListaItem.UnidadesPorBulto > 0
+				? i.ProductoListaItem.UnidadesPorBulto
+				: 1);
+
+			if (unidadesNecesariasPorCombo <= 0)
+				continue;
+
+			var combosPosiblesProducto = (int)(i.ProductoListaItem.StockEnUnidades / unidadesNecesariasPorCombo);
+
+			if (combosPosiblesProducto < maxPorTodos)
+				maxPorTodos = combosPosiblesProducto;
+		}
+
+		if (maxPorTodos == int.MaxValue)
+			maxPorTodos = 0;
+
+		return maxPorTodos;
+	}
+
+
+
+	// ClienteItem oClienteItemV2 = new ClienteItem();
+
+	// private async Task TransmitirPuntos()
+	// {
+
+	// 	posvd = await oGPS.GetCurrentLocationV2(JS);
+
+	// 	this.StateHasChanged();
+
+	// }
+
+	private async Task CrearCarritoReactivado(int carritoCabeceraID)
+	{
+
+
+	}
+
+
+	private async Task GenerarVistaSubProductos(int subCategoriaAMostrar)
+	{
+
+		////test
+
+		foreach (var prod in lsProductos)
+		{
+
+			foreach (var cate in prod.ImagenWeb)
+			{
+
+				if (cate == subCategoriaAMostrar)
+				{
+					lsProductos.Add(prod);
+				}
+
+			}
+		}
+	}
+	private async Task<int> GetCategorias()
+	{
+		lsCategorias = await oProductoListaService.GetCatgorias(JS);
+
+		
+
+		lsSubCategorias = await oProductoListaService.GetSubCatgorias(JS);
+
+		return 1;
+	}
+
+	private async Task abrirSubcagtegoria(MouseEventArgs e, int cat)
+	{
+
+		_navigationManager.NavigateTo("/vistaProductos/" + cat + "/");
+
+		return;
+		// lsSubCategoriasElegida.Clear();
+		// //   var lsSubCatElegida = lsSubCategorias.Where(c => c.categoriasID == cat);//.FirstOrDefault().SubCat.Add(sub);
+		// foreach (var sub in lsSubCategorias)
+		// {
+		//    foreach (var cate in sub.categoriasID)
+		//    {
+
+		//        if (cate == cat)
+		//        {
+		//            lsSubCategoriasElegida.Add(sub);
+		//        }
+
+		//    }
+		// }
+		// vista = "sub";
+
+		// if (!estoyretrocediendo)
+		// {
+		//    var mig = new Migajas();
+		//    mig.Lugar = "categoria";
+		//    mig.Valor = cat.ToString();
+		//    migajas.Add(mig);
+
+		// }
+		// estoyretrocediendo = false;
+
+	}
+
+	private async Task FiltrarProductosxSubcagtegoria(MouseEventArgs e, int subcat)
+	{
+		textoFiltro = "";
+		vista = "cata";
+		ulitmaSubcatElegida = subcat;
+		Traer(subcat);
+
+	}
+	private async Task openCategorias()
+	{
+		//  await JS.InvokeVoidAsync("openCategoriasModal");
+		vista = "cate";
+		this.StateHasChanged();
+
+	}
+
+
+	//Modificado 17-02-20225
+	//TODO:COMENTE BUSQUEDA
+	// public void SettextoFiltro(string Value)
+	// {
+	//     // Guardamos el texto actual en textoFiltro
+	//     textoFiltro = Value;
+
+	//     // Comparamos con el texto anterior para detectar retroceso
+	//     bool esRetroceso = textoFiltro.Length < textoFiltroAnterior.Length;
+
+	//     // Si hay texto ingresado, ocultamos la lupa
+	//     if (textoFiltro.Length > 0)
+	//     {
+	//         JS.InvokeVoidAsync("OcultarLupa");
+	//     }
+
+	//     // Solo realizamos la b�squeda si el texto tiene m�s de 2 caracteres
+	//     if (textoFiltro.Length > 2)
+	//     {
+	//         vista = "cata";  // Se ajusta la vista, si es necesario.
+
+	//         try
+	//         {
+	//             // Si no estamos retrocediendo o si el texto tiene m�s de 2 caracteres
+	//             if (!esRetroceso || (esRetroceso && textoFiltro.Length >= 3))
+	//             {
+	//                 // Realizamos la b�squeda si no estamos retrocediendo o si el texto tiene m�s de 2 caracteres
+	//                 Traer(0);
+	//             }
+	//         }
+	//         catch
+	//         {   
+	//             // Si hay un error, limpiamos el filtro
+	//             textoFiltro = "";
+	//         }
+	//     }
+
+	//     // Guardamos el texto actual como el anterior para la pr�xima comparaci�n
+	//     textoFiltroAnterior = textoFiltro;
+	//     textoFiltro = "";
+	// }
+	private string textoUsuario = "";
+	private CancellationTokenSource _cts;
+
+	// NUEVO: control de carreras entre requests
+	private long _requestSeq = 0;
+
+	// NUEVO: debounce corto para fluidez
+	private const int DebounceMs = 1500;
+	private const int DebounceStopMs = 1500; // 1.5s para "cuando deje de escribir"
+
+
+	// NUEVO: evita colisiones en cargas pesadas de Traer
+	private readonly SemaphoreSlim _fetchLock = new(1, 1);
+
+	// NUEVO: flag de carga para tu UI (si no lo us�s, igual sirve de protecci�n)
+	private bool isCargando = false;
+
+	// NUEVO: cache simple para bajar carga (clave = subcat|query|cliente|color)
+	private readonly System.Collections.Concurrent.ConcurrentDictionary<string, List<ProductoListaItem>> _cache
+		= new System.Collections.Concurrent.ConcurrentDictionary<string, List<ProductoListaItem>>();
+
+	public async Task SettextoFiltro(string value)
+	{
+		try
+		{
+			textoUsuario = value ?? string.Empty;
+			bool esRetroceso = textoUsuario.Length < (textoFiltroAnterior?.Length ?? 0);
+
+			if (textoUsuario.Length > 0)
+			{
+				await JS.InvokeVoidAsync("OcultarLupa");
+			}
+
+			_cts?.Cancel();
+			_cts?.Dispose();
+			_cts = new CancellationTokenSource();
+			var token = _cts.Token;
+
+			// Disparamos b�squeda s�lo si: 0 chars (home/lo que me gusta) o 3+ chars (filtro)
+			if (textoUsuario.Length >= 3 || textoUsuario.Length == 0)
+			{
+				var mySeq = System.Threading.Interlocked.Increment(ref _requestSeq);
+
+				await Task.Delay(DebounceMs, token);
+				if (token.IsCancellationRequested) return;
+				if (mySeq != _requestSeq) return;
+
+				vista = "cata";
+
+				// No borramos el input: aplicamos el filtro reci�n ac�
+				textoFiltro = textoUsuario;
+
+				// Elegimos subcat seg�n tu regla: vac�o => 100002 (lo que m�s me gusta), si no => 0
+				var subcat = (textoUsuario.Length == 0) ? 100002 : 0;
+
+				// Mantengo tu condici�n de retroceso: no hace falta ac�, ya que estamos aplicando filtro solo con 0 o 3+
+				await Traer(subcat);
+			}
+
+			textoFiltroAnterior = textoUsuario;
+		}
+		catch (TaskCanceledException)
+		{
+			// Cancelaci�n por debounce: no hacer nada.
+		}
+		catch (OperationCanceledException)
+		{
+			// Tambi�n cancelaci�n: no hacer nada.
+		}
+		catch (Exception ex)
+		{
+			// Manejo de errores
+			await JS.InvokeVoidAsync("console.error", $"SettextoFiltro error: {ex}");
+			// opcional: toast no bloqueante
+			// await JS.InvokeVoidAsync("mostrarToast", "Error al filtrar, intent� nuevamente.");
+		}
+	}
+
+
+
+
+	private void resetBusqueda()
+	{
+
+
+		Task.Delay(500000).ContinueWith((task) =>
+		{
+			textoFiltro = "";
+		});
+
+
+
+	}
+
+
+	// 	private async Task TraerOrquestadoAsync(int subcat, string query, long mySeq, CancellationToken token)
+	// {
+	//     try
+	//     {
+	//         isCargando = true;
+	//         await InvokeAsync(StateHasChanged);
+
+	//         if (mySeq != _requestSeq || token.IsCancellationRequested) return;
+
+	//         // Validaci�n de sincronizaci�n (tu l�gica ya existente)
+	//         if ((oParam.FechaUltimaSincronizacion == DateTime.MinValue ||
+	//              oParam.FechaUltimaSincronizacion < DateTime.Today) &&
+	//             oParam.Vendedor != null && oParam.Vendedor != "")
+	//         {
+	//             if (!token.IsCancellationRequested)
+	//                 _navigationManager.NavigateTo("/");
+	//             return;
+	//         }
+
+	//         // Clave para cachear resultados finales de Traer seg�n subcat+query+cliente+color
+	//         string cacheKey = $"sub:{subcat}|q:{query}|c:{clienteID}|col:{Color}";
+	//         if (_cache.TryGetValue(cacheKey, out var cached))
+	//         {
+	//             // Aplicar cache (�ltimo gana)
+	//             if (token.IsCancellationRequested || mySeq != _requestSeq) return;
+
+	//             // No borrar el input jam�s
+	// 				if (subcat == 0) textoFiltro = query;
+	//             ulitmaSubcatElegida = subcat;
+
+	//             lsProductos = cached;
+	//             lsProductosBack = cached;
+
+	//             mostrarSelect = true;
+	//             return;
+	//         }
+
+	//         // Evitar reentradas pesadas a Traer
+	//         await _fetchLock.WaitAsync(token);
+	//         try
+	//         {
+	//             if (token.IsCancellationRequested || mySeq != _requestSeq) return;
+
+	//             // Establecer el filtro que usar� Traer
+	//             textoFiltro = query;
+
+	//             // Ejecutar tu Traer (contiene toda tu l�gica actual)
+	//             await SafeCall(() => Traer(subcat), token);
+
+	//             if (token.IsCancellationRequested || mySeq != _requestSeq) return;
+
+	//             // Guardar en cache el resultado que dej� Traer en lsProductos
+	//             _cache[cacheKey] = lsProductos ?? new List<ProductoListaItem>();
+	//         }
+	//         finally
+	//         {
+	//             if (_fetchLock.CurrentCount == 0) _fetchLock.Release();
+	//         }
+	//     }
+	//     catch (TaskCanceledException)
+	//     {
+	//         // Silencioso
+	//     }
+	//     catch (OperationCanceledException)
+	//     {
+	//         // Silencioso
+	//     }
+	//     catch (Exception ex)
+	//     {
+	//         await JS.InvokeVoidAsync("console.error", $"TraerOrquestadoAsync error: {ex}");
+	//         // opcional: await JS.InvokeVoidAsync("mostrarToast", "Ocurri� un error al cargar productos.");
+	//     }
+	//     finally
+	//     {
+	//         isCargando = false;
+	//         await InvokeAsync(StateHasChanged);
+	//     }
+	// }
+
+
+	private static async Task<T?> SafeCall<T>(Func<Task<T>> action, CancellationToken token)
+	{
+		try
+		{
+			token.ThrowIfCancellationRequested();
+			var res = await action();
+			token.ThrowIfCancellationRequested();
+			return res;
+		}
+		catch (TaskCanceledException)
+		{
+			return default;
+		}
+		catch (OperationCanceledException)
+		{
+			return default;
+		}
+	}
+
+	private static async Task SafeCall(Func<Task> action, CancellationToken token)
+	{
+		try
+		{
+			token.ThrowIfCancellationRequested();
+			await action();
+			token.ThrowIfCancellationRequested();
+		}
+		catch (TaskCanceledException) { }
+		catch (OperationCanceledException) { }
+	}
+
+	public async Task Traer(int subcat)
+	{
+		try
+		{
+			botonActivo = "";
+			ProductoListaService oProductoListaService = new ProductoListaService();
+
+			ulitmaSubcatElegida = subcat;
+			lsProductos = lsProductosBack;
+			DateTime hoy = DateTime.Today;
+
+			if ((oParam.FechaUltimaSincronizacion == DateTime.MinValue ||
+					oParam.FechaUltimaSincronizacion < hoy) && oParam.Vendedor != null && oParam.Vendedor != "")
+			{
+				_navigationManager.NavigateTo("/");
+				return;
+			}
+
+			if (subcat > 0)
+			{
+				OrdenSeleccionado = 0;
+				if (!estoyretrocediendo)
+				{
+					var mig = new Migajas { Lugar = "subcat", Valor = subcat.ToString() };
+					migajas.Add(mig);
+					estoyretrocediendo = false;
+				}
+			}
+
+			if (textoFiltro != "")
+			{
+				OrdenSeleccionado = 0;
+
+				if (!estoyretrocediendo)
+				{
+					var mig = new Migajas { Lugar = "busqueda", Valor = textoFiltro };
+					migajas.Add(mig);
+					estoyretrocediendo = false;
+				}
+
+				lsProductos = await oProductoListaService.GetFiltroDelCliente(textoFiltro, clienteID, lsProductosTTDelCliente);
+			}
+			else
+			{
+				// OPTIMIZACI�N: si el filtro est� vac�o, NO uses IndexOf por item.
+				// Equivalente: todos los productos con ComboID == 0
+				var baseSinFiltro = lsProductosTT.Where(c => c.ComboID == 0).ToList();
+				lsProductos = await oProductoListaService.LlenarCantidadEnCarrito(
+					clienteID,
+					baseSinFiltro
+				);
+			}
+
+			// Limpieza de asociaciones (mantenemos tu l�gica tal cual)
+			foreach (var item in lsProductosTT) item.ClientesIDAsociado = 0;
+			foreach (var item in lsProductos)   item.ClientesIDAsociado = 0;
+
+			lsCombosProducto = lsProductosTT.Where(c => c.ProductosID < 0).Take(50).ToList();
+
+			// Subcategor�a concreta
+			if (subcat > 0 && subcat < 100000)
+			{
+				botonActivo = "btn5";
+				var prodenSubcat = await oProductosSubCategoriasService.GetProductosIDxSubcategoria(subcat);
+				// Para evitar evaluar Any(...) n^2, materializamos IDs en set
+				var idsSubcat = new HashSet<int>(prodenSubcat.Select(x => x.ProductosID));
+				var lsProductosSubC = lsProductosTT.Where(c => idsSubcat.Contains(c.ProductosID));
+				lsProductos = lsProductosSubC.ToList();
+			}
+
+			// combos
+			if (subcat == 100001)
+			{
+				botonActivo = "btn4";
+				mostrarSelect = false;
+				if (Color > 0)
+					lsProductos = lsProductosTT.Where(c => c.ProductosID < 0 && c.Color == Color).ToList();
+				else
+					lsProductos = lsProductosTT.Where(c => c.ProductosID < 0).ToList();
+			}
+
+			// lo que m�s me gusta
+			if (subcat == 100002)
+			{
+				botonActivo = "btn1";
+				lsProductos = await CargarSeccionesLoQmasMeGusta(clienteID, lsProductosTT, Color);
+			}
+
+			// lo m�s pedido
+			if (subcat == 100003)
+			{
+				botonActivo = "btn2";
+				lsProductos = await CargarSeccionesLoMasPedido(Color);
+			}
+
+			// nuevos ingresos
+			if (subcat == 100004)
+			{
+				botonActivo = "btn3";
+				_tituloSeccion.Clear();
+				lsProductos = await oProductoListaService.GetNuevosIngresosService(JS, lsProductosTT, Color);
+			}
+
+			// carrito y lo m�s pedido
+			if (subcat == 100005)
+			{
+				botonActivo = "btn2";
+				lsProductos = await CargarSeccionesLoMasPedido(Color);
+				AbrirModalCarrito();
+			}
+
+			lsProductosBack = lsProductos;
+
+			lsMarcas = lsProductos
+				.GroupBy(p => p.Marca)
+				.Select(g => g.First().Marca)
+				.ToList();
+
+			// Carrito / totales (sin cambios de l�gica)
+			cartview = await oProductoListaService.LlenarCantidadEnCarrito(clienteID, lsProductosTT);
+			cartviewCombos = await GenerarCarritoProductoCombos(clienteID);
+			var totalCarritoCombos = cartviewCombos.Sum(c => c.TotalLinea);
+			totalCarritoProductos = cartview.Sum(c => c.TotalLinea);
+			totalCarrito = totalCarritoProductos + totalCarritoCombos;
+			totalCarritoFinal = totalCarrito;
+			totalCarritoNeto = cartviewCombos.Sum(c => c.TotalLineaNeto) + cartview.Sum(c => c.TotalLineaNeto);
+
+        faltaArrastre = await oProductoListaService.EstadoArrastreParaCombos(cartview, cartviewCombos, clienteID);
+
+        if (subcat > 0 && subcat < 100000)
+        {
+            var lsOrdenado = lsProductos.OrderBy(c => c.OrdenXVista);
+            lsProductos = lsOrdenado.ToList();
+        }
+
+        _displayedCount = _pageSize;
+        _todasComisionesSonVerdaderas = lsProductos.All(p => p.ComisionDiferencial);
+        this.StateHasChanged();
+        mostrarSelect = true;
+    }
+    catch (Exception ex)
+    {
+        await JS.InvokeVoidAsync("console.error", $"Traer error: {ex.Message}");
+        // Opcional: pod�s disparar un toast no bloqueante
+        // await JS.InvokeVoidAsync("mostrarToast", "Ocurri� un error al cargar productos.");
+    }
+}
+
+	// public async Task Traer(int subcat)
+	// {
+	// 	try
+	// 	{
+	// 		botonActivo = "";
+	// 		ProductoListaService oProductoListaService = new ProductoListaService();
+
+	// 		ulitmaSubcatElegida = subcat;
+	// 		lsProductos = lsProductosBack;
+	// 		DateTime hoy = DateTime.Today;
+
+	// 		if ((oParam.FechaUltimaSincronizacion == DateTime.MinValue ||
+	// 						oParam.FechaUltimaSincronizacion < hoy) && oParam.Vendedor != null && oParam.Vendedor != "")
+	// 		{
+	// 			_navigationManager.NavigateTo("/");
+	// 			return;
+	// 		}
+
+	// 		if (subcat > 0)
+	// 		{
+	// 			// ?? NO limpiamos el filtro para no borrar lo que escribi� el usuario
+	// 			// textoFiltro = "";
+
+	// 			OrdenSeleccionado = 0;
+	// 			if (!estoyretrocediendo)
+	// 			{
+	// 				var mig = new Migajas();
+	// 				mig.Lugar = "subcat";
+	// 				mig.Valor = subcat.ToString();
+	// 				migajas.Add(mig);
+	// 				estoyretrocediendo = false;
+	// 			}
+	// 		}
+
+	// 		if (textoFiltro != "")
+	// 		{
+	// 			OrdenSeleccionado = 0;
+
+	// 			if (!estoyretrocediendo)
+	// 			{
+	// 				var mig = new Migajas();
+	// 				mig.Lugar = "busqueda";
+	// 				mig.Valor = textoFiltro;
+	// 				migajas.Add(mig);
+	// 				estoyretrocediendo = false;
+	// 			}
+
+	// 			// Mantengo tu llamada original
+	// 			lsProductos = await oProductoListaService.GetFiltroDelCliente(textoFiltro, clienteID, lsProductosTTDelCliente);
+	// 		}
+	// 		else
+	// 		{
+	// 			lsProductos = await oProductoListaService.LlenarCantidadEnCarrito(
+	// 				clienteID,
+	// 				lsProductosTT.Where(c => c.TextoParaBusqueda.IndexOf(textoFiltro, StringComparison.InvariantCultureIgnoreCase) != -1 && c.ComboID == 0).ToList()
+	// 			);
+	// 		}
+
+	// 		foreach (var item in lsProductosTT)
+	// 		{
+	// 			item.ClientesIDAsociado = 0;
+	// 		}
+	// 		foreach (var item in lsProductos)
+	// 		{
+	// 			item.ClientesIDAsociado = 0;
+	// 		}
+
+	// 		lsCombosProducto = lsProductosTT.Where(c => c.ProductosID < 0).Take(50).ToList();
+
+	// 		// Subcategor�a concreta
+	// 		if (subcat > 0 && subcat < 100000)
+	// 		{
+	// 			botonActivo = "btn5";
+	// 			var prodenSubcat = await oProductosSubCategoriasService.GetProductosIDxSubcategoria(subcat);
+	// 			var lsProductosSubC = lsProductosTT.Where(c => prodenSubcat.Any(c2 => c2.ProductosID == c.ProductosID));
+	// 			lsProductos = lsProductosSubC.ToList();
+	// 		}
+
+	// 		// combos
+	// 		if (subcat == 100001)
+	// 		{
+	// 			botonActivo = "btn4";
+	// 			mostrarSelect = false;
+	// 			if (Color > 0)
+	// 			{
+	// 				lsProductos = lsProductosTT.Where(c => c.ProductosID < 0 && c.Color == Color).ToList();
+	// 			}
+	// 			else
+	// 			{
+	// 				lsProductos = lsProductosTT.Where(c => c.ProductosID < 0).ToList();
+	// 			}
+	// 		}
+
+	// 		// lo que m�s me gusta
+	// 		if (subcat == 100002)
+	// 		{
+	// 			botonActivo = "btn1";
+	// 			lsProductos = await GetLoQmasMeGusta(clienteID, lsProductosTT, Color);
+	// 			DivLoMasGus = true;
+	// 		}
+
+	// 		// lo m�s pedido
+	// 		if (subcat == 100003)
+	// 		{
+	// 			botonActivo = "btn2";
+	// 			lsProductos = await oProductoListaService.GetLoMasPedidoService(JS, lsProductosItemsTT, Color);
+	// 		}
+
+	// 		// nuevos ingresos
+	// 		if (subcat == 100004)
+	// 		{
+	// 			botonActivo = "btn3";
+	// 			lsProductos = await oProductoListaService.GetNuevosIngresosService(JS, lsProductosTT, Color);
+	// 		}
+
+	// 		// carrito y lo m�s pedido
+	// 		if (subcat == 100005)
+	// 		{
+	// 			botonActivo = "btn2";
+	// 			lsProductos = await oProductoListaService.GetLoMasPedidoService  (JS, lsProductosItemsTT, Color);
+	// 			AbrirModalCarrito();
+	// 		}
+
+	// 		lsProductosBack = lsProductos;
+
+	// 		lsMarcas = lsProductos
+	// 					.GroupBy(p => p.Marca).Select(g => g.First().Marca).ToList();
+
+	// 		// ?? NO borres el texto si no hay resultados:
+	// 		// if (lsProductos.Count() == 0 && subcat != 100002)
+	// 		// {
+	// 		//     textoFiltro = "";
+	// 		// }
+
+	// 		cartview = await oProductoListaService.LlenarCantidadEnCarrito(clienteID, lsProductosTT);
+	// 		cartviewCombos = await GenerarCarritoProductoCombos(clienteID);
+	// 		var totalCarritoCombos = cartviewCombos.Sum(c => c.TotalLinea);
+	// 		totalCarritoProductos = cartview.Sum(c => c.TotalLinea);
+	// 		totalCarrito = totalCarritoProductos + totalCarritoCombos;
+
+	// 		totalCarritoNeto = cartviewCombos.Sum(c => c.TotalLineaNeto);
+	// 		totalCarritoNeto += cartview.Sum(c => c.TotalLineaNeto);
+
+	// 		faltaArrastre = await oProductoListaService.EstadoArrastreParaCombos(cartview, cartviewCombos, clienteID);
+
+	// 		if (subcat > 0 && subcat < 100000)
+	// 		{
+	// 			var lsOrdenado = lsProductos.OrderBy(c => c.OrdenXVista);
+	// 			lsProductos = lsOrdenado.ToList();
+	// 		}
+
+	// 		// ?? Si resetBusqueda() borra el input, NO lo llames aqu�.
+	// 		// resetBusqueda();
+
+	// 		this.StateHasChanged();
+	// 		mostrarSelect = true;
+	// 	}
+	// 	catch (Exception ex)
+	// 	{
+	// 		await JS.InvokeVoidAsync("console.error", $"Traer error: {ex.Message}");
+	// 		// opcional: toast no bloqueante
+	// 		// await JS.InvokeVoidAsync("mostrarToast", "Ocurri� un error al cargar productos.");
+	// 	}
+	// }
+
+
+
+
+	private async Task AbrirModalCarrito()
+	{
+		// ParametrosServices oParam = new ParametrosServices();
+
+		//Cuando es cliente calculamos los Netos segun percepciones antes de trasnmitir el pedido a MP
+		@if (tipoVendedor)
+		{
+			ActualizarValorFinalCarrito();
+		}
+		else
+		{
+			totalCarritoFinal = totalCarrito;
+		}
+		await JS.InvokeVoidAsync("openCarritoModal");
+		//es un combo
+	}
+
+	private async Task AbrirModalProducto(int prodID)
+	{
+		if (prodID > 0)
+		{
+
+			comboidActual = 0;
+			AppVendedores2025.Services.ProductoListaService oProductosService = new AppVendedores2025.Services.ProductoListaService();
+
+			prodInfoModal = lsProductosTT.Where(c => c.ProductosID == prodID).ToList().FirstOrDefault();
+
+			// Construir precios de combo por ComboId para pasar al modal
+			_mejorPrecioComboModal = "";
+			_preciosConCargoModal = new Dictionary<int, string>();
+
+			if (prodInfoModal != null && _comboPreciosLookup.TryGetValue(prodID, out var combosItems))
+			{
+				decimal mejorDecimal = decimal.MaxValue;
+				foreach (var cpItem in combosItems.Where(cp => cp.ComboTipo == 0))
+				{
+					var txt = GetTextoPrecioFromCombosItem(cpItem);
+					if (!string.IsNullOrWhiteSpace(txt))
+					{
+						_preciosConCargoModal[cpItem.ComboId] = txt;
+						var val = ParsearTextoComboPrecio(txt);
+						if (val < mejorDecimal)
+						{
+							mejorDecimal = val;
+							_mejorPrecioComboModal = txt;
+						}
+					}
+				}
+			}
+
+			this.StateHasChanged();
+			await JS.InvokeVoidAsync("addtocartModal");//, prodNombre, prodMarca, prodSku, prodPrecio, prodPrecioporUnidad, prodPrecioSinIva, prodImg);
+		}
+		else
+		{
+			var ok= await	TraerCombo(-prodID);
+
+
+			//    await  TraerCombo(-prodID,lsProductosCC,lsProductosSC,lsProductosTT,comboHeadItem,cantidadDeCombo,clienteID,cantCC,cantSC);
+
+
+			await JS.InvokeVoidAsync("openmodalCombo");
+
+			this.StateHasChanged();
+		}
+
+	}
+
+	private async Task BorrarCarritodelCliente(MouseEventArgs r)
+	{
+
+		//  int clienteID = Int32.Parse(await JS.InvokeAsync<string>("getCookie", "clienteID"));
+
+		await BorrarCarritodelCliente_shared(clienteID);
+		Traer(0);
+		this.StateHasChanged();
+	}
+
+	private async Task ActualizarCantidadCarrito(ChangeEventArgs e, ProductoListaItem proIT, int cantincrementar, int listaPrecio)
+	{
+		// ParametrosServices oParam = new ParametrosServices();
+		int cantenbox = 0;
+		if (e != null)
+		{ cantenbox = Convert.ToInt32(e.Value); }
+
+
+
+		proIT.ListaDePreciosUsada = (int)(oParam.ListadePrecios);
+		// prodInfoModal puede ser null (p.ej. agregar al carrito desde la grilla sin haber abierto
+		// antes el modal de detalle, o si AbrirModalProducto no encontró el producto en lsProductosTT).
+		// Usamos proIT (el producto real que se está agregando) como fallback.
+		if (proIT.CantidadEnCarrito == 0 && cantincrementar == 0 && !(prodInfoModal?.DesactivadoParaLaVenta ?? proIT.DesactivadoParaLaVenta) && cantenbox < 1)
+		{
+			cantincrementar = 1;
+		}
+
+		if (proIT.UnidadesParaCompetarUnBulto > 1 && bultoV2)
+		{
+			cantincrementar = cantincrementar * proIT.UnidadesParaCompetarUnBulto;
+			decimal rr = proIT.CantidadEnCarrito / proIT.UnidadesParaCompetarUnBulto;
+			proIT.CantidadEnCarrito = (int)Math.Floor(rr) * proIT.UnidadesParaCompetarUnBulto;
+		}
+
+		if(cantenbox > 0 && cantincrementar == 0)
+		{
+			cantincrementar = cantenbox;
+		}
+
+		await ActualizarCantidadCarrito_Shared(e, proIT, cantincrementar, JS, listaPrecio, cf);
+		cartview = await oProductoListaService.LlenarCantidadEnCarrito(clienteID, lsProductosTT);
+		//      totalCarrito = await oProductoListaService.TotalEnCarrito(lsProductosTT);
+		faltaArrastre = await oProductoListaService.EstadoArrastreParaCombos(cartview, cartviewCombos, clienteID);
+
+		cartviewCombos = await GenerarCarritoProductoCombos(clienteID);
+		var totalCarritoCombos = cartviewCombos.Sum(c => c.TotalLinea);
+		totalCarritoProductos = cartview.Sum(c => c.TotalLinea);
+		totalCarrito = totalCarritoProductos + totalCarritoCombos;
+
+		//Cuando es cliente calculamos los Netos segun percepciones antes de trasnmitir el pedido a MP
+		@if (tipoVendedor)
+		{
+			totalCarritoNeto = cartviewCombos.Sum(c => c.TotalLineaNeto);
+			totalCarritoNeto += cartview.Sum(c => c.TotalLineaNeto);
+			ActualizarValorFinalCarrito();
+		}
+		else
+		{
+			totalCarritoFinal = totalCarrito;
+		}
+
+
+		if (cartviewCombos.Count() == 0 && cartview.Count() == 0)
+		{
+			totalCarritoFinal = 0;
+			Traer(100002);
+			await JS.InvokeVoidAsync("cerrarModal");
+
+		}
+		cantidadActual = 0;
+		bultoV2 = false;
+		this.StateHasChanged();
+	}
+
+	private async Task SincronizarYTransmitir(List<(int ProductosID, int Cantidad)> pendientes)
+	{
+		foreach (var (pid, qty) in pendientes)
+		{
+			var prod = lsProductosTT.FirstOrDefault(p => p.ProductosID == pid);
+			if (prod != null)
+			{
+				var args = new ChangeEventArgs { Value = qty.ToString() };
+				await ActualizarCantidadCarrito(args, prod, 0, listaaUsar);
+			}
+		}
+		await Transmitir(totalCarritoFinal, totalCarritoNeto);
+	}
+
+	private string CambiarColorCombos()
+	{
+		if (linecombo)
+		{
+			linecombo = false;
+			return "#f4d392";
+		}
+		else
+		{
+			linecombo = true;
+			return "#b7cd78";
+		}
+	}
+	private async Task FiltrarCombos()
+	{
+		textoFiltro = "";
+		vista = "cata";
+		mostrarSelect = false;
+		//filtra combos
+		Traer(100001);
+
+	}
+
+
+	private string SwitchGrupo(int grupo)
+	{
+		string css = "";
+
+		switch (grupo)
+		{
+			case 0:
+				css = "grupo0";
+				break;
+			case 1:
+				css = "grupo1";
+				break;
+			case 2:
+				css = "grupo2";
+				break;
+		}
+		return css;
+	}
+
+	private async Task ActualizarCantidadCarritoCombos(ChangeEventArgs e, ProductoListaItem proIT, int cantincrementar)
+	{
+		try
+		{
+
+			if (proIT == null)
+				return;
+
+			int cantNueva;
+
+			// 1) Determinar la nueva cantidad pedida
+			if (e != null)
+			{
+				var raw = e.Value?.ToString();
+
+				if (string.IsNullOrWhiteSpace(raw))
+				{
+					cantNueva = 0;
+				}
+				else if (!int.TryParse(raw, out cantNueva))
+				{
+					// Si no se puede parsear, vuelvo a la cantidad actual para no romper
+					cantNueva = proIT.CantidadEnCarrito;
+				}
+			}
+			else
+			{
+				cantNueva = proIT.CantidadEnCarrito + cantincrementar;
+			}
+
+			if (cantNueva < 0)
+				cantNueva = 0;
+
+			// 2) Limite por producto * cantidad de combos
+			//    Ej: si CantidadMaximaPorGrupo = 2 y cantidadDeCombo = 3 => max 6 unidades de ese producto
+			if (proIT.CantidadMaximaPorGrupo > 0)
+			{
+				// Por las dudas, si cantidadDeCombo viene 0, que al menos sea 1
+				var totalCombos = Math.Max(1, cantidadDeCombo);
+
+				var maxPorProducto = proIT.CantidadMaximaPorGrupo * totalCombos;
+
+				if (cantNueva > maxPorProducto)
+					cantNueva = maxPorProducto;
+			}
+
+			// Asignamos la cantidad YA CAPADA por el l�mite del producto
+			proIT.CantidadEnCarrito = cantNueva;
+
+			//==============================================================================
+			// 3) L�gica de combos CON CARGO / SIN CARGO (igual que la tuya, pero usando
+			//    la cantidad ya corregida de proIT.CantidadEnCarrito)
+			//==============================================================================
+
+			// --- CC: productos con cargo
+			var cantCCenComboAbierto = lsProductosCC.Sum(c => c.CantidadEnCarrito);
+
+			// Si el combo es din�mico (CantidadDinamica != 0)
+			if (comboHeadItem.CantidadDinamica != 0)
+			{
+				var cantDinamicaGrp = comboHeadItem.GetCantidadesGrupo;
+
+				var cantGrupoCarr = lsProductosCC
+					.Where(c => c.NroDeGrupoCombo == proIT.NroDeGrupoCombo)
+					.Sum(c => c.CantidadEnCarrito);
+
+				var totalCombos = Math.Max(1, cantidadDeCombo);
+				var maxGrupo = cantDinamicaGrp[proIT.NroDeGrupoCombo] * totalCombos;
+
+				if (cantGrupoCarr > maxGrupo)
+				{
+					var sobra = maxGrupo - cantGrupoCarr; // sobra ser� negativo
+					proIT.CantidadEnCarrito += sobra;     // resta lo que se pas�
+					if (proIT.CantidadEnCarrito < 0)
+						proIT.CantidadEnCarrito = 0;
+
+					StateHasChanged();
+				}
+			}
+
+			if (proIT.ConCargo)
+			{
+				// validar cant total en combo cc
+				var cantTotalCC = lsProductosCC.Where(c => c.ConCargo).Sum(c => c.CantidadEnCarrito);
+
+				var totalCombos = Math.Max(1, cantidadDeCombo);
+				var maxCC = cantCC * totalCombos;
+
+				if (cantTotalCC > maxCC)
+				{
+					var sobra = maxCC - cantTotalCC;   // negativo
+					proIT.CantidadEnCarrito += sobra;  // ajusta para no pasarse
+
+					if (proIT.CantidadEnCarrito < 0)
+						proIT.CantidadEnCarrito = 0;
+
+					StateHasChanged();
+				}
+			}
+
+			// --- SC: productos sin cargo
+			if (!proIT.ConCargo)
+			{
+				var cantSCenComboAbierto = lsProductosSC
+					.Where(l => l.NroDeGrupoCombo != 1)
+					.Sum(c => c.CantidadEnCarrito);
+
+				var cantTotalSC = cantSCenComboAbierto;
+
+				var totalCombos = Math.Max(1, cantidadDeCombo);
+				var maxSC = comboHeadItem.CantSCargo * totalCombos;
+
+				// L�mite total de productos sin cargo del combo
+				if (cantTotalSC > maxSC)
+				{
+					var sobra = maxSC - cantTotalSC;   // negativo
+					proIT.CantidadEnCarrito += sobra;  // ajusta para no pasarse
+
+					if (proIT.CantidadEnCarrito < 0)
+						proIT.CantidadEnCarrito = 0;
+
+					StateHasChanged();
+				}
+
+				if (cantTotalSC < 0)
+				{
+					proIT.CantidadEnCarrito = 0;
+				}
+			}
+
+			//==============================================================================
+			// 4) Recalcular estado de arrastre / combo
+			//==============================================================================
+
+			if (cartview.Count > 0 || cartviewCombos.Count > 0)
+			{
+				faltaArrastre = await oProductoListaService
+					.EstadoArrastreParaCombos(cartview, cartviewCombos, clienteID);
+			}
+
+			CheckStatusCombo1();
+			StateHasChanged();
+		}
+		catch (Exception ex)
+		{
+			// Manejo de errores b�sico: pod�s reemplazar con tu logger o mostrar toast
+			Console.WriteLine($"Error en ActualizarCantidadCarritoCombos: {ex}");
+
+			// Ejemplo: dejar la cantidad en un estado consistente si algo se rompe
+			// proIT.CantidadEnCarrito = Math.Max(0, proIT.CantidadEnCarrito);
+			StateHasChanged();
+		}
+	}
+
+	private bool CheckStatusCombo1()
+	{
+		msgErrorCombo = "";
+		bool comboOk = true;
+		var cantTotalSC = lsProductosSC.Where(l => l.NroDeGrupoCombo != 1).Sum(c => c.CantidadEnCarrito);
+
+		//  ver arrastre
+		var montoenCartparaArrastre = totalCarritoProductos;
+
+		// cartviewCombos;
+		var cantTotalCC = lsProductosCC.Where(c => c.ConCargo).Sum(c => c.CantidadEnCarrito);
+
+		if (cantTotalCC != cantCC * cantidadDeCombo && comboHeadItem.CantidadDinamica != 0)
+		{
+			msgErrorCombo += "" + ((cantCC * cantidadDeCombo) - cantTotalCC) + " " + AppResources.ConCargo + " \n";
+			comboOk = false;
+		}
+
+
+		if (cantTotalSC != comboHeadItem.CantSCargo * cantidadDeCombo)
+		{
+			msgErrorCombo += "" + ((comboHeadItem.CantSCargo * cantidadDeCombo) - cantTotalSC) + " " + AppResources.SinCargo;
+			comboOk = false;
+		}
+
+		if (comboOk)
+		{
+
+		}
+		else
+		{
+
+		}
+
+		return comboOk;
+	}
+
+
+
+
+	private async Task<bool> TraerCombo(int comboid1)
+	{
+		comboidActual = comboid1;
+		lsProductosCC.Clear();
+		lsProductosSC.Clear();
+		ProductoListaService oProductoItemService = new ProductoListaService();
+		CombosItemService oCombosItemService = new CombosItemService();
+		//taer header del combo
+		var resHeader = (await oCombosItemService.GetCombosHeadItem(comboidActual));
+		comboHeadItem = resHeader[0];
+		cantidadDeCombo = 1;
+
+		var lsProdCombo = await oCombosItemService.GetProductosByID(comboidActual);
+
+
+		await oProductoListaService.LlenarCantidadEnCarrito(clienteID, lsProductosTT.ToList());
+
+		if (comboHeadItem.CantidadDinamica != 0)
+		{
+			cantCC = comboHeadItem.CantidadDinamica;
+		}
+		else
+		{
+			cantCC = comboHeadItem.Cantidad;
+		}
+
+		cantSC = comboHeadItem.CantSCargo;
+
+		foreach (var i in lsProdCombo)
+		{
+			var p = await oProductoItemService.GetByIdLista(i.ComboProductoID);
+			if (i.ComboTipo == 0)
+			{
+				var itco = p;
+				// itco.ConCargo = true;
+				itco.PorcentajDescuento1 = Convert.ToDecimal(i.Descuento1);
+				itco.PorcentajDescuento2 = Convert.ToDecimal(i.Descuento2);
+				itco.NroDeGrupoCombo = i.NrGrupoDinamico;
+				itco.CantidadMaximaPorGrupo = i.CantidadConCargo;
+				itco.ComboCodigo = comboHeadItem.Codigo;
+				if (i.ProductoListaItem.StockEnUnidades > 0)
+				{
+					lsProductosCC.Add(itco);
+				}
+			}
+			else
+			{
+				var itco = p;
+				// itco.ConCargo = false;
+				itco.PrecioUnitarioFinalAlamcene = 0;
+				itco.PrecioUnitarioFinalAutoservicio = 0;
+				itco.PrecioUnitarioFinalEspecial = 0;
+				itco.PrecioUnitarioFinalKiosko = 0;
+				itco.CantidadMaximaPorGrupo = i.CantidadConCargo;
+				itco.ComboCodigo = comboHeadItem.Codigo;
+				if (i.NrGrupoDinamico == 1)
+				{
+					itco.ComboCodigo = comboHeadItem.Codigo + " * Automatic *";
+					itco.NroDeGrupoCombo = i.NrGrupoDinamico;
+
+				}
+				//daniel
+
+				if (i.ProductoListaItem.StockEnUnidades > 0)
+				{
+					lsProductosSC.Add(itco);
+				}
+			}
+		}
+		if (comboHeadItem.CantidadDinamica == 0)
+		{
+			foreach (var ccIt in lsProductosCC)
+			{
+				ccIt.CantidadEnCarrito = ccIt.CantidadMaximaPorGrupo * cantidadDeCombo;
+			}
+			if (lsProductosSC.Count() == 1)
+			{
+				foreach (var ccIt in lsProductosSC)
+				{
+					if (lsProductosSC.Count() == 1)
+						ccIt.CantidadEnCarrito = ccIt.CantidadMaximaPorGrupo * cantidadDeCombo;
+				}
+			}
+
+
+		}
+
+
+		foreach (var ccIt in lsProductosCC)
+		{
+			var cantXGrupo = lsProductosCC.Where(c => c.NroDeGrupoCombo == ccIt.NroDeGrupoCombo).Count();
+			if (cantXGrupo == 1)
+			{
+				ccIt.CantidadEnCarrito = ccIt.CantidadMaximaPorGrupo * cantidadDeCombo;
+				ccIt.NombreDelCombo = "1";
+			}
+		}
+		foreach (var ccIt in lsProductosSC)
+		{
+			var cantXGrupoSc = lsProductosSC.Where(c => c.NroDeGrupoCombo == ccIt.NroDeGrupoCombo).Count();
+			if (cantXGrupoSc == 1 && lsProductosSC.Count() == 1)
+			{
+				// if(ccIt.)
+				ccIt.CantidadEnCarrito = ccIt.CantidadMaximaPorGrupo * cantidadDeCombo;
+				ccIt.NombreDelCombo = "1";
+			}
+
+			if (ccIt.NroDeGrupoCombo == 1)
+				ccIt.CantidadEnCarrito = ccIt.CantidadMaximaPorGrupo * cantidadDeCombo;
+
+			if (ccIt.CantidadMaximaPorGrupo == 1 && lsProductosSC.Count == 1)
+				ccIt.CantidadEnCarrito = ccIt.CantidadMaximaPorGrupo * cantidadDeCombo;
+		}
+		lsProductosCC = await oCombosItemService.GetTextoPrecioCalculadoEnCombo(comboHeadItem, lsProductosCC, 0);
+		lsProductosSC = await oCombosItemService.GetTextoPrecioCalculadoEnCombo(comboHeadItem, lsProductosSC, 1);
+
+		return true;
+
+		this.StateHasChanged();
+
+	}
+	private async Task CantidadDeCombos(ChangeEventArgs e, int cantincrementar)
+	{
+
+		// check max por punto de venta
+		int cantNueva;
+
+		if (!(e is null))
+		{
+			if (e.Value.ToString() == "") { cantNueva = 1; }
+			else
+			{
+				cantNueva = Convert.ToInt32(Math.Floor(Convert.ToDouble(e.Value.ToString())));
+
+			}
+
+			if (cantNueva < 1) cantNueva = 1;
+		}
+		else
+		{
+			cantNueva = cantidadDeCombo + cantincrementar;
+			if (cantNueva < 1) cantNueva = 1;
+
+		}
+		if (cantNueva < cantidadDeCombo)
+		{
+			//borrar tdodo
+			foreach (var item in lsProductosCC)
+			{
+				item.CantidadEnCarrito = 0;
+			}
+			foreach (var item in lsProductosSC)
+			{
+				item.CantidadEnCarrito = 0;
+			}
+		}
+		//   ignorar si esta en cero
+		if (cantNueva > comboHeadItem.CantidadMaximaPorCliente && comboHeadItem.CantidadMaximaPorCliente != 0)
+		{ cantNueva = comboHeadItem.CantidadMaximaPorCliente; }
+
+		if (cantNueva > comboHeadItem.CantidadMaximaPorFactura && comboHeadItem.CantidadMaximaPorFactura != 0)
+		{ cantNueva = comboHeadItem.CantidadMaximaPorFactura; }
+
+		cantidadDeCombo = cantNueva;
+
+
+
+		//AQUI VALIDAR PARA QUE ENTRE CUANDO NO SEA DINAMICA
+
+		if (comboHeadItem.CantidadDinamica == 0)
+		{
+			foreach (var ccIt in lsProductosCC)
+			{
+				ccIt.CantidadEnCarrito = ccIt.CantidadMaximaPorGrupo * cantidadDeCombo;
+			}
+			foreach (var ccIt in lsProductosSC)
+			{
+				ccIt.CantidadEnCarrito = ccIt.CantidadMaximaPorGrupo * cantidadDeCombo;
+			}
+
+		}
+		else
+		{
+			foreach (var ccIt in lsProductosSC)
+			{
+				if(ccIt.NroDeGrupoCombo == 1)
+					ccIt.CantidadEnCarrito = ccIt.CantidadMaximaPorGrupo * cantidadDeCombo;
+			}	
+		}
+
+
+
+
+		foreach (var ccIt in lsProductosCC)
+		{
+			var cantXGrupo = lsProductosCC.Where(c => c.NroDeGrupoCombo == ccIt.NroDeGrupoCombo).Count();
+			if (cantXGrupo == 1)
+			{
+				ccIt.CantidadEnCarrito = ccIt.CantidadMaximaPorGrupo * cantidadDeCombo;
+				ccIt.NombreDelCombo = "1";
+			}
+		}
+		foreach (var ccIt in lsProductosSC)
+		{
+			var cantXGrupoSc = lsProductosSC.Where(c => c.NroDeGrupoCombo == ccIt.NroDeGrupoCombo).Count();
+			if (cantXGrupoSc == 1 && lsProductosSC.Count() == 1)
+			{
+				// if(ccIt.)
+				ccIt.CantidadEnCarrito = ccIt.CantidadMaximaPorGrupo * cantidadDeCombo;
+				ccIt.NombreDelCombo = "1";
+			}
+		}
+
+
+
+
+
+
+
+		CheckStatusCombo1();
+		this.StateHasChanged();
+	}
+
+	private async Task CerrarCombo()
+	{
+		var statusCombo = CheckStatusCombo1();
+		//var statusCombosStock = 0;
+
+		ClienteItemService oclienteItemService = new ClienteItemService();
+
+
+		var cliDatos = await oclienteItemService.GetByID(clienteID);
+
+		//var cf = await JS.InvokeAsync<bool>("esCf");
+
+
+
+		if (statusCombo)
+		{
+			//combo ok
+
+			//borrar combo anterior
+			await oPedidoCabeceraService.BorrarByClienteIdyComboIDSinTx(clienteID, comboidActual);
+
+
+			decimal valorFinalCombo = 0;
+			foreach (var it in lsProductosCC)
+			{
+				if (it.CantidadEnCarrito > 0)
+				{
+
+					
+					if (it.PorcentajDescuento1 > 0 || it.PorcentajDescuento2 > 0)
+					{
+						var s = it.TextoCombo(listaaUsar)?.Trim(); // "4657,21"
+						s = s.Replace(",", ".");  // quita miles si vinieran y deja punto decimal
+						valorFinalCombo = decimal.Parse(s, CultureInfo.InvariantCulture);
+					// 	decimal valorFinalConDescuento1 = 0;
+					// 	decimal valorFinalConDescuento2 = 0;
+					// 	decimal precioLista = it.PrecioUnitarioFinal(listaaUsar);
+
+					// 	if (it.PorcentajDescuento1 > 0)
+					// 	{
+
+					// 		var porcCalculado = (precioLista * it.PorcentajDescuento1) / 100;
+					// 		var precioConDescuento = precioLista - porcCalculado;
+					// 		valorFinalConDescuento1 = precioConDescuento;
+
+					// 	}
+					// 	if (it.PorcentajDescuento2 > 0)
+					// 	{
+
+					// 		var porcCalculado = (precioLista * it.PorcentajDescuento2) / 100;
+					// 		var precioConDescuento = precioLista - porcCalculado;
+					// 		valorFinalConDescuento2 = precioConDescuento;
+					// 	}
+
+					// 	valorFinalCombo = valorFinalConDescuento1 + valorFinalConDescuento2;
+					}
+					else
+					{
+						valorFinalCombo = it.PrecioUnitarioFinal(listaaUsar);
+					}
+					//await oPedidoCabeceraService.AgregarPedidosCombo(clienteID, it.ProductosID, it.CantidadEnCarrito, listaaUsar, comboid, it.PrecioUnitarioFinal(listaaUsar),it.PrecioUnitarioNeto(listaaUsar) , it.NroDeGrupoCombo, cliDatos.cli_codigo, cliDatos.cli_direccion, it.Nombre, it.CodigoDeProducto, cf,it.UnidadesPorBulto, cantidadDeCombo,vendedorID,version,it.ComboCodigo );
+
+					await oPedidoCabeceraService.AgregarPedidosCombo(clienteID, it.ProductosID, it.CantidadEnCarrito, listaaUsar, comboidActual, valorFinalCombo, it.PrecioUnitarioNeto(listaaUsar), it.NroDeGrupoCombo, cliDatos.cli_codigo, cliDatos.cli_direccion, it.Nombre, it.CodigoDeProducto, cf, it.UnidadesPorBulto, cantidadDeCombo, vendedorID, version, it.ComboCodigo);
+				}
+			}
+
+
+			foreach (var it in lsProductosSC)
+			{
+				if (it.CantidadEnCarrito > 0)
+				{
+					await oPedidoCabeceraService.AgregarPedidosCombo(clienteID, it.ProductosID, it.CantidadEnCarrito, listaaUsar, comboidActual, 0, 0, it.NroDeGrupoCombo, cliDatos.cli_codigo, cliDatos.cli_direccion, it.Nombre, it.CodigoDeProducto, cf, it.UnidadesPorBulto, cantidadDeCombo, vendedorID, version, it.ComboCodigo);
+				}
+
+			}
+
+
+			//  await  oPedidoCabeceraService.AgregarPedidos(clienteID, proIT.ProductosID,cantNueva ,lsprcios);
+			await App.Current.MainPage.DisplayAlert(AppResources.Atencion, AppResources.GuardarCombo, AppResources.Aceptar);
+			//   _navigationManager.NavigateTo("/catalogoproductos", true);
+			_navigationManager.NavigateTo("/vistaProductos/" + 100002, true);
+		}
+		else
+		{
+			//combo incompleto
+			if (!statusCombo)
+			{
+
+				StringBuilder sb = new StringBuilder();
+
+				sb.AppendLine("Falta cargar:");
+				sb.AppendLine(msgErrorCombo);
+
+
+				await App.Current.MainPage.DisplayAlert(AppResources.Atencion, sb.ToString(), AppResources.Aceptar);
+			}
+			else
+			{
+				//await App.Current.MainPage.DisplayAlert(AppResources.Atencion, resultadoValidarCombo.Mensaje +"  "+resultadoValidarCombo.Valor, AppResources.Aceptar);
+
+			}
+		}
+
+
+	}
+
+	private async Task BorrarCombodelCArritoxClienteID(MouseEventArgs r, int comboid)
+	{
+
+		PedidoCabeceraService oPedidoCabeceraService = new PedidoCabeceraService();
+		var cabecera = await oPedidoCabeceraService.GetByClienteIDsnTX(clienteID);
+
+		await BorrarCombodelCArritoxClienteID_shared(clienteID, comboid, cabecera.PedidoCabeceraID); 
+
+		cartview = await oProductoListaService.LlenarCantidadEnCarrito(clienteID, lsProductosTT);
+		cartviewCombos = await GenerarCarritoProductoCombos(clienteID);
+		var totalCarritoCombos = cartviewCombos.Sum(c => c.TotalLinea);
+		totalCarritoProductos = cartview.Sum(c => c.TotalLinea);
+		totalCarrito = totalCarritoProductos + totalCarritoCombos;
+
+
+		@if (tipoVendedor)
+		{
+			totalCarritoNeto = cartviewCombos.Sum(c => c.TotalLineaNeto);
+			totalCarritoNeto += cartview.Sum(c => c.TotalLineaNeto);
+			ActualizarValorFinalCarrito();
+		}
+		else
+		{
+
+			totalCarritoFinal = totalCarrito;
+		}
+
+		if (cartviewCombos.Count() == 0 && cartview.Count() == 0)
+		{
+			totalCarritoFinal = 0;
+			Traer(100002);
+			await JS.InvokeVoidAsync("cerrarModal");
+		}
+
+		Traer(0);
+		this.StateHasChanged();
+	}
+
+	private void CambiarLista(ChangeEventArgs e)
+	{
+
+		int ListaSeleccionada = Int32.Parse(e.Value.ToString());
+		listaaUsar = SeleccionarLista(ListaSeleccionada);
+		this.StateHasChanged();
+		var atest = 1;
+
+	}
+
+
+	[JSInvokable]
+	public void BotonAtrasMigajas()
+	{
+		// var js = new IJSRuntime();
+
+		JS.InvokeAsync<string>("cerrarTodosModal");
+		//  estoyretrocediendo = true;
+		if (migajas.Count() > 1)
+		{
+			estoyretrocediendo = true;
+
+			migajas.RemoveAt(migajas.Count - 1);
+			var ult = migajas.Last();
+			if (ult.Lugar == "subcat")
+			{
+				FiltrarProductosxSubcagtegoria(new MouseEventArgs(), Int32.Parse(ult.Valor));
+			}
+			if (ult.Lugar == "busqueda")
+			{
+				SettextoFiltro(ult.Valor);
+			}
+			if (ult.Lugar == "categoria")
+			{
+				abrirSubcagtegoria(new MouseEventArgs(), Int32.Parse(ult.Valor));
+			}
+		}
+		else
+		{
+			vista = "cate";
+		}
+		this.StateHasChanged();
+	}
+	enum BotonEnLaQueEstoy
+	{
+		MasMeGusta,
+		LoMasPedido,
+		Catalogo,
+		NuevoIngresos,
+		PortalVendedores
+	}
+
+	static BotonEnLaQueEstoy btoEnElQueEstoy { get; set; } = BotonEnLaQueEstoy.LoMasPedido;
+
+	private async Task LoQmasMeGusta()
+	{
+		btoEnElQueEstoy = BotonEnLaQueEstoy.LoMasPedido;
+		//btoEnElQueEstoy = BotonEnLaQueEstoy.MasMeGusta;
+
+		lsProductos = await CargarSeccionesLoQmasMeGusta(clienteID, lsProductosTT, Color);
+
+		this.StateHasChanged();
+
+	}
+
+
+	private async Task LoMasPedido()
+	{
+
+		btoEnElQueEstoy = BotonEnLaQueEstoy.LoMasPedido;
+
+		lsProductos = await CargarSeccionesLoMasPedido(Color);
+		this.StateHasChanged();
+	}
+	private async Task NuevosIngresos()
+	{
+		btoEnElQueEstoy = BotonEnLaQueEstoy.NuevoIngresos;
+		//flagNuevosIngresos = true;
+		lsProductos = await oProductoListaService.GetNuevosIngresosService(JS, lsProductosTT, Color);
+		this.StateHasChanged();
+		//flagNuevosIngresos = false;
+	}
+	private async Task Catalogo()
+	{
+		btoEnElQueEstoy = BotonEnLaQueEstoy.Catalogo;
+		_navigationManager.NavigateTo("/catalogoproductos/", true);
+	}
+
+
+
+
+	private void SeleccionarMarca(ChangeEventArgs e)
+	{
+		lsProductos = lsProductosBack;
+		MarcaSeleccionada = e.Value.ToString();
+		if (MarcaSeleccionada == "Todos")
+		{
+			MarcaSeleccionada = "";
+			Traer(ulitmaSubcatElegida);
+		}
+		else
+		{
+			lsProductosBack = lsProductos;
+			lsProductos = lsProductos.Where(c => c.Marca == MarcaSeleccionada).ToList();
+			_displayedCount = _pageSize;
+			_todasComisionesSonVerdaderas = lsProductos.All(p => p.ComisionDiferencial);
+			this.StateHasChanged();
+		}
+	}
+
+
+	public enum OrdenSeleccionadoParaFiltrar
+	{
+		MayorVenta,
+		SinUso,
+		MenorPrecio,
+		MayorPrecio,
+		Nombre,
+		IngresosReciente,
+		UltimasUnidades,
+		CombosOferta,
+		NuevasIncorPoraciones,
+		ProductosDestacados,
+		PreciosModicados
+
+	}
+
+
+
+	private void SeleccionarOrden(ChangeEventArgs e)
+	{
+		OrdenSeleccionado = Convert.ToInt32(e.Value);
+		bool estoyEnCatalogo = btoEnElQueEstoy == BotonEnLaQueEstoy.Catalogo;
+
+		// lsProductosBack es la fuente de verdad del view actual, seteada por Traer().
+		// Nunca se sobreescribe aquí para que todos los filtros partan de la misma base.
+		var base_ = lsProductosBack ?? lsProductos;
+
+		OrdenSeleccionadoParaFiltrar ordenSel = (OrdenSeleccionadoParaFiltrar)OrdenSeleccionado;
+		switch (ordenSel)
+		{
+			case 0:
+				lsProductos = base_.OrderByDescending(p => p.TotalVenta).ToList();
+				LoQmasMeGusta();
+				botonActivo = "btn1";
+				break;
+
+			case OrdenSeleccionadoParaFiltrar.MenorPrecio:
+				lsProductos = base_.OrderBy(p => p.PrecioUnitarioFinalAutoservicio).ToList();
+				break;
+
+			case OrdenSeleccionadoParaFiltrar.MayorPrecio:
+				lsProductos = base_.OrderByDescending(p => p.PrecioUnitarioFinalAutoservicio).ToList();
+				break;
+
+			case OrdenSeleccionadoParaFiltrar.Nombre:
+				lsProductos = base_.OrderBy(p => p.Nombre).ToList();
+				break;
+
+			case OrdenSeleccionadoParaFiltrar.IngresosReciente:
+				lsProductos = base_.Where(p => p.IngresosRecientes && p.ProductosID > 0).ToList();
+				break;
+
+			case OrdenSeleccionadoParaFiltrar.UltimasUnidades:
+				lsProductos = base_.Where(p => p.StockEnUnidades > 0 && p.DiasDeStockDisponible < 4 && p.ProductosID > 0).ToList();
+				break;
+
+			case OrdenSeleccionadoParaFiltrar.CombosOferta:
+				// Los combos tienen ID negativo y solo viven en lsProductosTT, no en la base del view.
+				lsProductos = lsProductosTT.Where(c => c.ProductosID < 0).ToList();
+				break;
+
+			case OrdenSeleccionadoParaFiltrar.NuevasIncorPoraciones:
+				lsProductos = base_.Where(p => p.NuevaIncorporacoin && p.ProductosID > 0).ToList();
+				break;
+
+			case OrdenSeleccionadoParaFiltrar.ProductosDestacados:
+				lsProductos = lsProdDif.ToList();
+				break;
+
+			case OrdenSeleccionadoParaFiltrar.PreciosModicados:
+				lsProductos = base_.Where(p => p.DiasDePrecioModificado < 8 && p.ProductosID > 0).ToList();
+				break;
+
+			default:
+				break;
+		}
+
+		if (!estoyEnCatalogo)
+		{
+			lsProductos = lsProductos.Where(p => (p.Color == Color || Color == 0)).ToList();
+		}
+
+		_displayedCount = _pageSize;
+		_todasComisionesSonVerdaderas = lsProductos.All(p => p.ComisionDiferencial);
+		this.StateHasChanged();
+	}
+
+
+
+
+	public async Task<int> BorrarProductodelCarrito(int proID, IJSRuntime JS)
+	{
+		//ParametrosServices oParam = new ParametrosServices();
+		ClienteItemService oclienteItemService = new ClienteItemService();
+		int VDID = Int32.Parse(oParam.VendedorID);
+
+		int cantNueva = 0;
+		var cliDatos = await oclienteItemService.GetByID(clienteID);
+
+		PedidoCabeceraService oPedidoCabeceraService = new PedidoCabeceraService();
+		var cabecera = await oPedidoCabeceraService.GetByClienteIDsnTX(clienteID);
+		PedidosDetalleItemService oPedidosDetalleItemService = new PedidosDetalleItemService();
+		var lsProductoEnPEdido = await oPedidosDetalleItemService.GetByPedidoCabezaraID_ProdID(cabecera.PedidoCabeceraID, proID, 0, false);
+		await oPedidosDetalleItemService.Delete(lsProductoEnPEdido);
+
+		// //Cuando es cliente calculamos los Netos segun percepciones antes de trasnmitir el pedido a MP
+		// @if (tipoVendedor)
+		// {
+		//     cartview = await oProductoListaService.LlenarCantidadEnCarrito(clienteID,lsProductosTT);
+		//     cartviewCombos = await GenerarCarritoProductoCombos(clienteID);
+		//     totalCarritoNeto = cartviewCombos.Sum(c => c.TotalLineaNeto);
+		//     totalCarritoNeto += cartview.Sum(c => c.TotalLineaNeto);
+		//     ActualizarValorFinalCarrito();
+		// }
+
+		cartview = await oProductoListaService.LlenarCantidadEnCarrito(clienteID, lsProductosTT);
+		cartviewCombos = await GenerarCarritoProductoCombos(clienteID);
+		var totalCarritoCombos = cartviewCombos.Sum(c => c.TotalLinea);
+		totalCarritoProductos = cartview.Sum(c => c.TotalLinea);
+		totalCarrito = totalCarritoProductos + totalCarritoCombos;
+		@if (tipoVendedor)
+		{
+			totalCarritoNeto = cartviewCombos.Sum(c => c.TotalLineaNeto);
+			totalCarritoNeto += cartview.Sum(c => c.TotalLineaNeto);
+			ActualizarValorFinalCarrito();
+		}
+		else
+		{
+			totalCarritoFinal = totalCarrito;
+		}
+		Traer(0);
+
+		if (cartviewCombos.Count() == 0 && cartview.Count() == 0)
+		{
+			totalCarritoFinal = 0;
+			Traer(100002);
+			await JS.InvokeVoidAsync("cerrarModal");
+		}
+		this.StateHasChanged();
+		return cantNueva;
+	}
+	public int cantEnCart()
+	{
+		int c = cartview.Count();
+		c += cartviewCombos.Count();
+		return c;
+	}
+	private void ActualizarComentario(ChangeEventArgs e)
+	{
+		comentario = e.Value.ToString();
+
+	}
+	// bool transmitiendo = false;
+	// public async Task Transmitir()
+
+	// {
+	//     var oPedidoCabeceraService = new PedidoCabeceraService ();
+	//     var head = await oPedidoCabeceraService.GetByClienteIDsnTX(clienteID);
+	//     if(head !=null)
+	//     {
+	//         if (!transmitiendo)
+	//         {
+	//             transmitiendo = true;
+
+	//             var res = await oPedidoCabeceraService.TransmitirPedido(head.PedidoCabeceraID, lsProductosItemsTT, comentario);
+
+	//             await App.Current.MainPage.DisplayAlert(AppResources.Atencion, res, AppResources.Aceptar);
+	//             transmitiendo = false;
+	//             Traer(100002);
+	//         }
+	//     }
+	// }
+
+
+	//Modificado "20/07
+
+
+	bool transmitiendo = false;
+
+	public async Task Transmitir(decimal totalCarrito, decimal totalNeto)
+	{
+
+		var oPedidoCabeceraService = new PedidoCabeceraService();
+		var head = await oPedidoCabeceraService.GetByClienteIDsnTX(clienteID);
+
+
+		DateTime hoy = DateTime.Today;
+		// DateTime tomorrow = DateTime.Today.AddDays(1);
+		if ((oParam.FechaUltimaSincronizacion == DateTime.MinValue ||
+						oParam.FechaUltimaSincronizacion < hoy) && oParam.Vendedor != null && oParam.Vendedor != "")
+		{
+			_navigationManager.NavigateTo("/");
+			return;
+		}
+
+
+		if (totalCarrito == 0)
+		{
+
+
+			await App.Current.MainPage.DisplayAlert(AppResources.Atencion, AppResources.CarritoNoIngresados, AppResources.Aceptar);
+		}
+		else
+		{
+			head.TotalPedido = totalCarrito;
+			await oPedidoCabeceraService.UpdateTotalPedido(head.PedidoCabeceraID, totalCarrito);
+		}
+
+		if (head != null)
+		{
+			bool confirmarTransmision = await App.Current.MainPage.DisplayAlert(AppResources.Confirmacion, AppResources.ConfirmacionTransmitirPedido, AppResources.Si, AppResources.No);
+
+			if (confirmarTransmision)
+			{
+
+
+				if (!transmitiendo)
+				{
+
+					transmitiendo = true;
+
+					await SafeJsVoid("showLoader");
+
+					@if (tipoVendedor && oParam.ListadePrecios == 7)
+					{
+						// ****************************************************Esteban Q.- 27/6/25 *************
+						//mandar transmision (INICIO)
+						// *************************************************************************************
+
+						await oPedidoCabeceraService.TransmitirJSonPedido(head.PedidoCabeceraID, lsProductosItemsTT, comentario, head.TotalPedido);
+
+						// *************************************************************************************
+						//mandar transmision (FIN)
+						// *************************************************************************************
+
+						//ParametrosServices oParam = new ParametrosServices();
+						var montoMinimo = oParam.montoMinimo;
+						bool confirmarTransmisionPercepcionYmontoMinimo = true;
+						if (head.TotalPedido < montoMinimo)
+						{
+							await App.Current.MainPage.DisplayAlert(AppResources.Atencion, AppResources.MinimoVenta + " " + montoMinimo + " $", AppResources.Aceptar);
+							confirmarTransmisionPercepcionYmontoMinimo = false;
+						}
+						// Esta variable es la que usaremos para guardar la respuesta del servicio
+						(string PagoID, string StatusPago, string Mensaje, string PaymentID) respuestaPagoRealizado = ("", "", "", "");
+						if (confirmarTransmisionPercepcionYmontoMinimo)
+						{
+							if (Parametros.ModoDemo)
+							{
+								await App.Current.MainPage.DisplayAlert("Modo demo", "Pago no disponible en modo demo", "Aceptar");
+								return;
+							}
+
+							string KeyPagoID = head.ClienteID + "_" + head.VendedorID + "_" + DateTime.Now.ToString("yyyyMMddHHmmss");
+							await oPedidoCabeceraService.UpdateKeyPagoID(head.PedidoCabeceraID, KeyPagoID);
+							var mercadoPago = new Preference();
+							var MP_Test = oParam.MP_Test;
+							try
+							{
+								if (MP_Test != "1")
+								{
+									mercadoPago = await PagoService.PagoPreference((double)head.TotalPedido, KeyPagoID);
+								}
+								else
+								{
+									mercadoPago = await PagoService.PagoPreference(1, KeyPagoID);
+								}
+							}
+							catch (Exception ex)
+							{
+								mercadoPago = await PagoService.PagoPreference((double)head.TotalPedido, KeyPagoID);
+							}
+							await Launcher.OpenAsync(mercadoPago.InitPoint);
+							var keyID = await oPedidoCabeceraService.ObtenerKeyPagoID(head.PedidoCabeceraID);
+							//var respuestaPagoRealizado = await PagoService.ConsultarPagoConIntervaloAsync(keyID);
+							// Mostrar el modal de progreso
+							isModalVisible = true;
+							progress = 0;  // Iniciar el progreso desde 0
+							// Asegurarse de que la UI se actualice al mostrar el modal
+							//StateHasChanged();
+							await InvokeAsync(StateHasChanged);
+							// Esta variable es la que usaremos para guardar la respuesta del servicio
+							//(string PagoID, string StatusPago, string Mensaje, string PaymentID) respuestaPagoRealizado = ("", "", "", "");
+
+							// Se inicia la consulta pero no se bloquea el c�digo
+							_ = Task.Run(async () =>
+							{
+								// Llamamos al servicio para consultar el estado del pago (esto se hace solo una vez)
+								respuestaPagoRealizado = await PagoService.ConsultarPagoConIntervaloAsync(keyID);
+
+								// Cuando recibimos la respuesta, actualizamos la variable
+								respPagoRecibido = true;
+
+								// Si el pago fue aprobado, actualizamos el progreso a 100%
+								if (respuestaPagoRealizado.StatusPago == "approved")
+								{
+									progress = 100;
+								}
+								else
+								{
+									progress = 100;  // Si el tiempo se agot� o hubo otro tipo de respuesta
+								}
+
+								// Forzar la actualizaci�n de la UI una vez que se tenga la respuesta
+								//StateHasChanged();
+								await InvokeAsync(StateHasChanged);
+							});
+
+							// Establecer el tiempo m�ximo para esperar la respuesta
+							var tiempoMaximo = TimeSpan.FromMinutes(5);
+							var inicio = DateTime.Now;
+
+							// Realizamos el ciclo solo para actualizar el progreso
+							while (DateTime.Now - inicio < tiempoMaximo)
+							{
+								// Si ya se ha recibido la respuesta (ya contiene alg�n dato), rompemos el ciclo
+								if (respPagoRecibido)
+								{
+									break;
+								}
+
+								// Incrementamos el progreso cada segundo
+								var progreso = (int)((DateTime.Now - inicio).TotalSeconds / tiempoMaximo.TotalSeconds * 100);
+								progress = progreso;  // Actualizamos el progreso en el frontend
+
+								//StateHasChanged();  // Forzamos la actualizaci�n de la UI
+								await InvokeAsync(StateHasChanged);
+
+								// Esperamos un segundo antes de hacer la siguiente consulta
+								await Task.Delay(1000);
+							}
+
+							// Cuando obtengamos la respuesta o se haya agotado el tiempo, cerramos el modal
+							isModalVisible = false;
+
+							// Aseguramos que la UI se actualice al cerrar el modal
+							//StateHasChanged();
+							await InvokeAsync(StateHasChanged);
+
+							var msj = respuestaPagoRealizado.Mensaje;
+							string paymentID = "";
+
+							if (respuestaPagoRealizado.StatusPago == "approved")
+							{
+								try
+								{
+									if (respuestaPagoRealizado.PaymentID != null)
+									{
+										paymentID = respuestaPagoRealizado.PaymentID;
+										await oPedidoCabeceraService.UpdatePaymentID(head.PedidoCabeceraID, paymentID);
+									}
+
+								}
+								catch { }
+
+								var res = await oPedidoCabeceraService.TransmitirPedido(head.PedidoCabeceraID, lsProductosItemsTT, comentario, head.TotalPedido, paymentID);
+
+								if (res.StartsWith("Ok"))
+								{
+									//pedidoTransmitido, 1 transmitido OK , 0 sin transmitir,
+									//await oPedidoCabeceraService.UpdatePedidoTransmitido(head.PedidoCabeceraID, 1);
+									await App.Current.MainPage.DisplayAlert(AppResources.Atencion, msj + " " + AppResources.PedidoCorrecto + " ", AppResources.Aceptar);
+
+								}
+								else
+								{
+									msj = res + " " + msj;
+
+									//await App.Current.MainPage.DisplayAlert(AppResources.Atencion, msj + " Tuvimos un problema con su pedido. Por favor, comun�quese con AppVendedores2025 Demo.", "Aceptar");
+									await App.Current.MainPage.DisplayAlert(AppResources.Atencion, msj + " " + AppResources.ProblemasPedido + " " + paymentID + " KeyID: " + keyID, AppResources.Aceptar);
+
+								}
+
+
+							}
+							else
+							{
+
+								await App.Current.MainPage.DisplayAlert(AppResources.Atencion, msj + " " + AppResources.ErrorPago + " " , AppResources.Aceptar);
+
+
+							}
+
+
+						}
+						else
+						{
+
+						}
+
+						await SafeJsVoid("hideLoader");
+						transmitiendo = false;
+						respPagoRecibido = false;
+						Traer(100002);
+						await JS.InvokeVoidAsync("cerrarModal");
+
+					}
+					else
+					{
+
+						// ****************************************************Esteban Q.- 27/6/25 *************
+						//mandar transmision (INICIO) Agrega a la tabla pedidojson el carrito completo sin trasmitir
+						// *************************************************************************************
+
+						await oPedidoCabeceraService.TransmitirJSonPedido(head.PedidoCabeceraID, lsProductosItemsTT, comentario, head.TotalPedido);
+
+						// *************************************************************************************
+						//mandar transmision (FIN)
+						// *************************************************************************************
+
+
+						try
+						{
+							var res = await oPedidoCabeceraService.TransmitirPedido(head.PedidoCabeceraID, lsProductosItemsTT, comentario, head.TotalPedido, "");
+
+							if (res.StartsWith("Ok"))
+							{
+								await App.Current.MainPage.DisplayAlert(AppResources.Atencion, " " + AppResources.PedidoIngresado + " ", AppResources.Aceptar);
+							}
+							else
+							{
+								await App.Current.MainPage.DisplayAlert(AppResources.Atencion, res, AppResources.Aceptar);
+							}
+						}
+						catch (Exception ex)
+						{
+							await App.Current.MainPage.DisplayAlert(AppResources.Atencion, "Error al transmitir: " + ex.Message, AppResources.Aceptar);
+						}
+						finally
+						{
+							await SafeJsVoid("hideLoader");
+							transmitiendo = false;
+							Traer(100002);
+							await JS.InvokeVoidAsync("cerrarModal");
+						}
+
+					}
+				}
+			}
+		}
+	}
+
+	// M�todo para cerrar el modal
+	public void CloseModal()
+	{
+		isModalVisible = false; // Cerrar el modal cuando se llama
+		bultoV2 = false;//TODO:cambio el estado para que no se quede en true al querer agregar por unidades
+	}
+
+	public async Task BorrarCart(int clienteid)
+	{
+
+		var res = await BorrarPedidoSinTx(clienteid);
+
+		//borrar percepciones del carrito
+		if (res == 0)
+		{
+			listaPercepcionesCalculadas.Clear();
+			totalCarritoFinal = 0;
+			totalCarritoNetoPercep = 0;
+		}
+
+		Traer(100002);
+		//cerrar modal
+
+		this.StateHasChanged();
+		await JS.InvokeVoidAsync("cerrarModal");
+	}
+	
+	public string ClassPrecio(ProductoListaItem it, int tipo)
+	{
+		bool tachar = false;
+		bool mostrardesc = false;
+		//1 p lleno 
+		//2pre con desc
+		if (it.PrecioNoCalculado == "N/Calc" && it.PorcentajDescuento1 == 0)
+
+		{
+			tachar = false;
+			mostrardesc = false;
+			//no mosrtar el de abajo
+
+		}
+		else
+		{
+			//ver si son iguales
+			decimal p1 = 0;
+			if (it.TextoCombo(listaaUsar) != "" && it.TextoCombo(listaaUsar) != null)
+			{
+
+				var texto = it.TextoCombo(listaaUsar)
+							.Trim()
+							.Replace(".", "")         // elimina puntos de miles
+							.Replace(",", ".");
+				p1 = decimal.Parse(texto, CultureInfo.InvariantCulture);
+			}
+			else { p1 = 0; }
+			var p2 = (it.PrecioUnitarioFinal(listaaUsar));
+
+
+			var diferencia = Math.Abs(p1 - p2);
+			if (diferencia < 0.30M || p1 == 0)
+			{
+				tachar = false;
+				mostrardesc = false;
+			}
+			else
+			{
+				tachar = true;
+				mostrardesc = true;
+			}
+
+			//text-decoration text-decoration: line-through;
+
+
+		}
+		string style;
+		if (tipo == 1)
+		{
+			if (tachar)
+			{
+				//style = "text-decoration: line-through  #f81404 4px;";
+
+				style = "text-decoration: line-through;color: #f81404; 4px;"; //MODIFICADO PARA IOS 
+			}
+			else
+			{
+				style = "arriba normla";
+			}
+
+			//
+		}
+		else
+		{
+			if (mostrardesc)
+			{
+				style = "abajo mostrar";
+			}
+			else
+			{
+				style = "display:none;";
+			}
+
+
+		}
+
+
+		return style;
+	}
+
+
+	/// <summary>
+	/// Devuelve una lista de fechas disponibles para entrega, excluyendo domingos,
+	/// aplicando reglas:
+	///  - Domingo: +2 d�as h�biles (llega martes)
+	///  - S�bado >= 14:00: +2 d�as h�biles (llega martes)
+	///  - Cualquier d�a >= 17:00: +2 d�as h�biles
+	///  - Otro caso: +1 d�a h�bil
+	/// </summary>
+	/// <param name="ahora">Fecha/hora base (opcional; por defecto DateTime.Now)</param>
+	/// <param name="cantidadDias">Cantidad de fechas a devolver (por defecto 7)</param>
+	public static List<DateTime> ObtenerDiasDisponibles(DateTime? ahora = null, int cantidadDias = 7)
+	{
+		var resultados = new List<DateTime>();
+		try
+		{
+			DateTime now = ahora ?? DateTime.Now;
+			DateTime hoy = now.Date;
+
+			// Reglas de inicio
+			DateTime inicio;
+
+			bool esDomingo = now.DayOfWeek == DayOfWeek.Sunday;
+			bool esSabado = now.DayOfWeek == DayOfWeek.Saturday;
+			bool sabadoDespuesDe14 = esSabado && now.TimeOfDay >= new TimeSpan(14, 0, 0);
+			bool despuesDe17 = now.TimeOfDay >= new TimeSpan(17, 0, 0);
+
+			if (esDomingo || sabadoDespuesDe14 || despuesDe17)
+			{
+				// +2 d�as h�biles
+				inicio = AddDiasHabiles(hoy, 2);
+			}
+			else
+			{
+				// +1 d�a h�bil
+				inicio = AddDiasHabiles(hoy, 1);
+			}
+
+			// Generar "cantidadDias" d�as, saltando domingos
+			int agregados = 0;
+			DateTime cursor = inicio;
+			while (agregados < cantidadDias)
+			{
+				if (cursor.DayOfWeek != DayOfWeek.Sunday)
+				{
+					resultados.Add(cursor);
+					agregados++;
+				}
+				cursor = cursor.AddDays(1);
+			}
+
+			return resultados;
+		}
+		catch (Exception ex)
+		{
+			// Manejo de errores: log interno y retorno seguro
+			Debug.WriteLine($"[ObtenerDiasDisponibles] Error: {ex}");
+			return new List<DateTime>(); // Devolvemos lista vac�a ante error
+		}
+	}
+
+	/// <summary>
+	/// Suma N d�as h�biles (sin contar domingos). El s�bado s� cuenta, salvo que caiga la regla de inicio.
+	/// </summary>
+	private static DateTime AddDiasHabiles(DateTime fechaBase, int cantidad)
+	{
+		int sumados = 0;
+		DateTime d = fechaBase;
+		while (sumados < cantidad)
+		{
+			d = d.AddDays(1);
+			if (d.DayOfWeek != DayOfWeek.Sunday)
+			{
+				sumados++;
+			}
+		}
+		return d;
+	}
+
+	private async Task ActualizarDia(ChangeEventArgs e)
+	{
+		var oPedidoCabeceraService = new PedidoCabeceraService();
+
+		// Obtener el pedido correspondiente por cliente
+		var head = await oPedidoCabeceraService.GetByClienteIDsnTX(clienteID);
+
+		// L�gica para manejar el d�a seleccionado
+		var diaSeleccionado = DateTime.Parse(e.Value.ToString());
+
+		//long timestampMilisegundos = new DateTimeOffset(diaSeleccionado).ToUnixTimeMilliseconds();
+
+		// Actualiza la fecha de pedido
+		head.FechaDeEntrega = diaSeleccionado;
+		fechaSeleccionada = head.FechaDeEntrega;
+
+
+		// Llama al m�todo para actualizar la fecha del pedido en la base de datos
+		var resultado = await oPedidoCabeceraService.UpdateFechaEntrega(head);
+
+		// Maneja el resultado
+		if (resultado > 0)
+		{
+			// Maneja el �xito (por ejemplo, mostrar un mensaje)
+			Console.WriteLine("Fecha de pedido actualizada correctamente.");
+			//diasDisponibles = ObtenerDiasDisponibles();          
+		}
+		else
+		{
+			// Maneja el caso en que no se actualiz� nada
+			Console.WriteLine("No se actualiz� ninguna fecha.");
+		}
+	}
+
+	public int ActualizarValorFinalCarrito()
+	{
+		//var oParam = new ParametrosServices();
+
+		if (totalCarritoNeto > 0)
+		{
+			var percepciones = oParam.ObtenerPercepciones();
+			listaPercepcionesCalculadas.Clear();
+			decimal TotalCarritoNet = totalCarritoNeto;
+
+			decimal porce = 0;
+			foreach (var itemPer in percepciones)
+			{
+
+				if (TotalCarritoNet >= itemPer.Monto)
+				{
+					try
+					{
+
+						decimal calculoPorcetaje = (TotalCarritoNet * itemPer.Porcentaje) / 100;
+						porce = porce + calculoPorcetaje;
+
+						// Crear el objeto din�mico
+						Percepciones percepcionDinamica = new Percepciones();
+
+						// Agregar las propiedades al objeto din�mico
+						percepcionDinamica.descripcion = itemPer.Descripcion;
+						percepcionDinamica.montoCalculado = calculoPorcetaje;
+						percepcionDinamica.porcentaje = itemPer.Porcentaje;
+
+						// Agregar el objeto a la lista
+						listaPercepcionesCalculadas.Add(percepcionDinamica);
+
+						calculoPorcetaje = 0;
+					}
+					catch { }
+				}
+
+			}
+
+
+			totalCarritoNetoPercep = porce;
+			totalCarritoFinal = totalCarrito + totalCarritoNetoPercep;
+		}
+		else
+		{
+			//borrar percepciones del carrito       
+			listaPercepcionesCalculadas.Clear();
+			totalCarritoNetoPercep = 0;
+			totalCarritoFinal = totalCarrito;
+		}
+
+		return 1;
+	}
+
+	public string imagenExternaParaCombo(int comboID)
+	{
+		int comboiD = Math.Abs(comboID);
+		var prodIDdeCombo = oCombosItemService.ObtenerPrimerProdIDCombo(comboiD);
+		if (prodIDdeCombo != null)
+		{
+			string urlWeb = "https://cdn.empresademo.example/CatalogoEcom/" + prodIDdeCombo + "_128.png";
+
+			//oCombosItemService.UpdateImageIDWebCombo(urlWeb, comboiD);
+			return urlWeb;
+		}
+		else
+		{
+			return "";
+		}
+
+	}
+
+	// public bool VerificarImagenExistente(string url)
+	// {
+	//        using (var client = new HttpClient())
+	//        {
+	//            try
+	//            {
+	//                var response = client.GetAsync(url).Result;
+	//                return response.IsSuccessStatusCode; // Si la respuesta es 200 OK, devuelve true
+	//            }
+	//            catch
+	//            {
+	//                return false; // Si ocurre un error (como un 404), devuelve false
+	//            }
+	//        }
+	// }
+
+
+
+	private decimal CalcularPorcentaje(decimal precioOriginal, decimal precioConDescuento)
+	{
+		decimal porcentaje = 0;
+		if (precioOriginal == 0)
+			return 0;
+			//return string.Empty;
+		if (precioConDescuento > 0)
+		{
+			decimal descuento = precioOriginal - precioConDescuento;
+			porcentaje = (descuento / precioOriginal) * 100;
+			porcentaje = Math.Round(porcentaje, 2);
+
+		}
+
+		return porcentaje;
+
+		//return $"{porcentaje.ToString("N0")}";
+
+	}
+
+	//private int cantidadProductoModal => prodInfoModal.CantidadEnCarrito * prodInfoModal.UnidadesPorBulto;
+	private int cantidadProductoModal
+	{
+		// Se evalúa en cada render (está bindeado en el markup del modal, que siempre está
+		// presente), así que prodInfoModal nulo no puede tirar NRE acá.
+		get => (prodInfoModal?.CantidadEnCarrito ?? 0) * (prodInfoModal?.UnidadesPorBulto ?? 0);
+		set
+		{
+			if (prodInfoModal == null) return;
+
+			if (prodInfoModal.UnidadesPorBulto > 0)
+			{
+				prodInfoModal.CantidadEnCarrito = value / prodInfoModal.UnidadesPorBulto;
+			}
+			else
+			{
+				prodInfoModal.CantidadEnCarrito = 0;
+			}
+		}
+	}
+	private async Task ModificarCantidadProducto(int cantidad)
+	{
+
+		if (prodInfoModal == null) return;
+
+		//ActualizarCantidadCarrito(null, prodInfoModal, cantidad, listaaUsar);
+		// Actualizamos solo la vista del modal
+
+		if (!bultoV2)
+		{
+			prodInfoModal.CantidadEnCarrito += cantidad;
+		}
+		else
+		{
+
+			prodInfoModal.CantidadEnCarrito += prodInfoModal.UnidadesParaCompetarUnBulto * cantidad;
+
+			if (prodInfoModal.UnidadesParaCompetarUnBulto == 0)
+			{
+				prodInfoModal.CantidadEnCarrito += cantidad;
+
+			}
+
+		}
+
+		if (prodInfoModal.CantidadEnCarrito < 0)//si es negativo lo resetea en cero
+		{
+			prodInfoModal.CantidadEnCarrito = 0;
+		}
+
+
+
+		StateHasChanged();// lo comente para que no refresque la pantalla y consuma recursos
+
+
+	}
+
+	 private async Task OnCategoriaSeleccionadaAsync(int categoriaId)
+    {
+        try
+        {
+            // Si vos ya tenes abrirSubcagtegoria(args,id), aca llamas tu logica:
+            // await abrirSubcagtegoria(default, categoriaId);
+
+            _navigationManager.NavigateTo($"/subCategorias/{categoriaId}");
+            await Task.CompletedTask;
+        }
+        catch (Exception ex)
+        {
+            _error = "No se pudo navegar a la subcategor�a: " + ex.Message;
+        }
+    }
+
+	private async Task SafeJs(string fn)
+    {
+        try { await JS.InvokeAsync<string>(fn); }
+        catch { /* no rompo UI */ }
+    }
+
+    private async Task SafeJsVoid(string fn)
+    {
+        try { await JS.InvokeVoidAsync(fn); }
+        catch { /* no rompo UI */ }
+    }
+}

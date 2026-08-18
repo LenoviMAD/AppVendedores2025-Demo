@@ -1,0 +1,18 @@
+﻿<?xml version="1.0" encoding="UTF-8" ?>
+<Application xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:AppVendedores2025"
+             x:Class="AppVendedores2025.App">
+    <Application.Resources>
+        <ResourceDictionary>
+
+            
+            <!-- Estilo que aplica el padding seguro a TODAS las páginas que lo usen -->
+            <Style x:Key="SafeAreaPageStyle" TargetType="ContentPage">
+                <Setter Property="Padding" Value="{DynamicResource SafeAreaPadding}" />
+                <Setter Property="BackgroundColor" Value="White" />
+            </Style>
+
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

@@ -1,0 +1,232 @@
+﻿@* Requiere Bootstrap y Bootstrap Icons (para la X de cerrar).
+   Uso recomendado con Bootstrap 5. *@
+@using AppVendedores2025.Resources.Strings
+@using AppVendedores2025.Localization
+@inject IJSRuntime JS
+
+@if (Open)
+{
+    <div class="modal fade show d-block"
+    tabindex="-1"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="@TitleId"
+    aria-describedby="@DescId"
+    style="background-color: rgba(0,0,0,0.6);"
+    @onclick="OnBackdropClick"
+    @onkeydown="OnKeyDown"
+    @onkeydown:preventDefault="true">
+        <div class="modal-dialog modal-dialog-centered @DialogSizeClass" @onclick:stopPropagation>
+            <div class="modal-content text-center p-3 shadow-lg rounded-3">
+
+                @if (ShowCloseIcon)
+                {
+                   @*  <div class="d-flex justify-content-end">
+                        <button type="button" class="btn btn-sm btn-link text-muted" title="@AppResources.Cerrar"
+                        @onclick="HandleDenyAsync" aria-label="Cerrar">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div> *@
+                }
+
+                <div class="mb-2">
+                    @if (!string.IsNullOrWhiteSpace(IconCss))
+                    {
+                        <i class="@IconCss" style="font-size: 3rem;"></i>
+                    }
+                </div>
+
+                <h5 id="@TitleId" class="fw-bold mb-2">@Title</h5>
+
+                <p id="@DescId" class="mb-2 px-3">
+                    @((MarkupString)BodyHtml)
+                </p>
+
+                @if (!string.IsNullOrWhiteSpace(SubtextHtml))
+                {
+                    <p class="text-muted mb-3 px-3" style="font-size: 0.9rem;">
+                        @((MarkupString)SubtextHtml)
+                    </p>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(ErrorMsg))
+                {
+                    <div class="alert alert-danger py-2 px-3 mb-3 text-start">
+                        <strong>Error:</strong> @ErrorMsg
+                    </div>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(ImageUrl))
+                {
+                    <div class="text-center">
+                        <img src="@ImageUrl"
+                        alt="@ImageAlt"
+                        class="img-fluid mb-4"
+                        style="max-height: 150px; max-width: 150px;" />
+                    </div>
+                }
+
+                @if (ShowBullets)
+                {
+                    <div class="small text-muted px-3 mb-3 text-start">
+                        <ul class="mb-0">
+                            @foreach (var item in Bullets ?? Enumerable.Empty<string>())
+                            {
+                                <li>@((MarkupString)item)</li>
+                            }
+                        </ul>
+                    </div>
+                }
+
+                <div class="d-flex justify-content-around gap-2 flex-wrap">
+                    @* @if (!HideDenyButton)
+                    {
+                        <button class="btn btn-outline-secondary px-4"
+                        @onclick="HandleDenyAsync">
+                            @DenyText
+                        </button>
+                    } *@
+                    <button class="btn btn-primary px-4"
+                    @onclick="HandleAcceptAsync"
+                    autofocus>
+                        @AppResources.Continuar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    // ---------- Parámetros de estado ----------
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+
+    // ---------- Eventos ----------
+    [Parameter] public EventCallback OnAccept { get; set; }
+    [Parameter] public EventCallback OnDeny { get; set; }
+
+    // ---------- Textos/Contenido ----------
+    [Parameter] public string Title { get; set; } = AppResources.TituloUbicacion;
+    [Parameter]
+    public string BodyHtml { get; set; } =
+       AppResources.BodyHTML;
+    [Parameter]
+    public string SubtextHtml { get; set; } =
+        AppResources.SubtextHTML;
+    [Parameter] public string AcceptText { get; set; } = AppResources.Aceptar;
+    [Parameter] public string DenyText { get; set; } = AppResources.Denegar;
+
+    // ---------- Diseño / apariencia ----------
+    [Parameter] public string IconCss { get; set; } = "bi bi-geo-alt-fill text-primary";
+    [Parameter] public string ImageUrl { get; set; } = "/img/gps_pr.png";                   
+    [Parameter] public string ImageAlt { get; set; } = "Representación de puntos de ubicación en mapa";
+    [Parameter] public string DialogSizeClass { get; set; } = ""; // ej: "modal-lg", "modal-xl"
+    [Parameter] public bool ShowCloseIcon { get; set; } = true;
+
+    // ---------- Opciones ----------
+    [Parameter] public bool CloseOnBackdropClick { get; set; } = true;
+    [Parameter] public bool HideDenyButton { get; set; } = false;
+    [Parameter] public bool ShowBullets { get; set; } = true;
+    [Parameter]
+    public IEnumerable<string>? Bullets { get; set; } = new[]
+    {
+        AppResources.Bullet1,
+        AppResources.Bullet2,
+        // , @"<a href=""/politica-de-privacidad"" target=""_blank"">Política de Privacidad</a>"
+    };
+
+    // ---------- Estado interno ----------
+    private string? ErrorMsg;
+    private string TitleId => $"gps-title-{GetHashCode()}";
+    private string DescId => $"gps-desc-{GetHashCode()}";
+
+    // ---------- Handlers con manejo de errores ----------
+    private async Task HandleAcceptAsync()
+    {
+        try
+        {
+            ErrorMsg = null;
+            if (OnAccept.HasDelegate)
+                await OnAccept.InvokeAsync();     
+                
+        AppVendedores2025.Services.GPSService oFuncionesSincronizar = new AppVendedores2025.Services.GPSService();
+        var estaSincronizado = await oFuncionesSincronizar.GetCurrentLocationV2(JS);
+            await CloseAsync();
+        }
+        catch (OperationCanceledException)
+        {
+            ErrorMsg = "Acción cancelada por el usuario.";
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            ErrorMsg = "No se pudo completar la acción. " + ex.Message;
+            Console.Error.WriteLine($"[GpsConsentModal.Accept] {ex}");
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleDenyAsync()
+    {
+        try
+        {
+            ErrorMsg = null;
+            if (OnDeny.HasDelegate)
+                await OnDeny.InvokeAsync();
+
+            await CloseAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMsg = "Ocurrió un error al cerrar el modal. " + ex.Message;
+            Console.Error.WriteLine($"[GpsConsentModal.Deny] {ex}");
+            StateHasChanged();
+        }
+    }
+
+    private async Task CloseAsync()
+    {
+        try
+        {
+            ErrorMsg = null;
+            await OpenChanged.InvokeAsync(false);
+        }
+        catch (Exception ex)
+        {
+            ErrorMsg = "No se pudo cerrar el modal. " + ex.Message;
+            Console.Error.WriteLine($"[GpsConsentModal.Close] {ex}");
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnBackdropClick()
+    {
+        if (!Open) return;
+        try
+        {
+            if (CloseOnBackdropClick)
+                await HandleDenyAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMsg = ex.Message;
+            Console.Error.WriteLine($"[GpsConsentModal.Backdrop] {ex}");
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        try
+        {
+            if (e.Key == "Escape" || e.Code == "Escape")
+                await HandleDenyAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMsg = ex.Message;
+            Console.Error.WriteLine($"[GpsConsentModal.KeyDown] {ex}");
+        }
+    }
+}

@@ -1,0 +1,86 @@
+@using AppVendedores2025.Resources.Strings
+
+@if (Open)
+{
+    <div class="msp-backdrop" @onclick="Cerrar"></div>
+
+    <div class="msp-wrapper" role="dialog" aria-modal="true">
+        <div class="msp-card">
+
+            <!-- Header azul corporativo -->
+            <div class="msp-header">
+                <div class="msp-header-left">
+                    <div class="msp-header-icon-wrap">
+                        <i class="bi-headset"></i>
+                    </div>
+                    <div>
+                        <div class="msp-title">@AppResources.SoporteTecnico</div>
+                        <div class="msp-subtitle">
+                            @AppResources.InfoSistema
+                            @if (!string.IsNullOrWhiteSpace(VersionApp))
+                            {
+                                <span style="margin-left:8px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);border-radius:100px;padding:1px 8px;font-size:0.65rem;font-weight:700;letter-spacing:1px;vertical-align:middle;">
+                                    v@(VersionApp)
+                                </span>
+                            }
+                        </div>
+                    </div>
+                </div>
+                <button class="msp-close-btn" @onclick="Cerrar" aria-label="Cerrar">
+                    <i class="bi-x-lg"></i>
+                </button>
+            </div>
+
+            <!-- Cuerpo: log del sistema -->
+            <div class="msp-body">
+                <pre class="msp-log">@TxtLog</pre>
+            </div>
+
+            <!-- Footer: botón de contacto según tipo de usuario -->
+            <div class="msp-footer">
+                @if (EsAutogestion)
+                {
+                    @if (!string.IsNullOrWhiteSpace(MailSoporte))
+                    {
+                        <a href="mailto:@MailSoporte" class="msp-wa-btn">
+                            <i class="bi-envelope msp-wa-icon"></i>
+                            <span>Enviar email de soporte</span>
+                        </a>
+                    }
+                    else
+                    {
+                        <span class="msp-error-msg">No se pudo obtener el contacto de soporte.</span>
+                    }
+                }
+                else
+                {
+                    @if (!string.IsNullOrWhiteSpace(LinkWhatsapp))
+                    {
+                        <a href="@LinkWhatsapp" class="msp-wa-btn">
+                            <i class="bi-whatsapp msp-wa-icon"></i>
+                            <span>@AppResources.EnviarWhatsapp</span>
+                        </a>
+                    }
+                    else
+                    {
+                        <span class="msp-error-msg">No se pudo obtener el contacto de soporte.</span>
+                    }
+                }
+            </div>
+
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+
+    [Parameter] public string TxtLog { get; set; } = "";
+    [Parameter] public string LinkWhatsapp { get; set; } = "";
+    [Parameter] public bool EsAutogestion { get; set; }
+    [Parameter] public string MailSoporte { get; set; } = "";
+    [Parameter] public string VersionApp { get; set; } = "";
+
+    private void Cerrar() => OpenChanged.InvokeAsync(false);
+}

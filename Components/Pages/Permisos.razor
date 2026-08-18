@@ -1,0 +1,25 @@
+﻿@page "/permisos"
+@inject AppVendedores2025.Services.PermisosUbicacionService PermisosService
+
+<h3>Permisos de Ubicación</h3>
+
+<button @onclick="PedirPermisos">Pedir “Siempre”</button>
+
+<p>@mensaje</p>
+
+@code {
+    string mensaje = "Pendiente…";
+
+    private async Task PedirPermisos()
+    {
+        try
+        {
+            var ok = await PermisosService.SolicitarUbicacionSiempreAsync();
+            mensaje = ok ? "Permisos concedidos (Always)" : "Permisos denegados o incompletos";
+        }
+        catch (Exception ex)
+        {
+            mensaje = "Error: " + ex.Message;
+        }
+    }
+}

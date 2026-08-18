@@ -1,0 +1,192 @@
+@page "/"
+@using AppVendedores2025.Services
+@using AppVendedores2025.Shared
+@using EntidadesAppVendedores
+@using Microsoft.JSInterop;
+@using System.Web;
+@using System.Text.Json;
+@using Microsoft.AspNetCore.Components.WebView.Maui
+@using Newtonsoft.Json;
+@using System.Net.Http.Json;
+@using AppVendedores2025.Resources.Strings
+@using AppVendedores2025.Localization
+@using AppVendedores2025.Components.Pages.IndexComponents
+@using AppVendedores2025.Components.Modals
+
+@inject AppVendedores2025.Services.FuncionesSincronizar oFuncionesSincronizar
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@inject NavigationManager _navigationManager
+@inherits UtilCompartidas
+@inject App.TimerService timerService
+@inject AppVendedores2025.Services.FuncionesSincronizar Sync
+
+@if (oParam.EsModoTest)
+{
+    <h6 style="color: #ff471a; position: fixed; top: 0; left: 0; width: 100%; background-color: rgba(255, 255, 255, 0.1); text-align: center; margin: 0; padding: 5px; z-index: 1000;">
+        MODO TEST
+    </h6>
+}
+
+<div id="loader">
+    <i class="fas fa-spinner fa-spin"></i>
+</div>
+<div class="progress-container sync-overlay-card" id="progressBarcontainer">
+    <div class="sync-card-inner">
+        <div class="sync-card-header">
+            <i class="bi bi-arrow-repeat sync-spin-icon"></i>
+            <span class="sync-card-title">@AppResources.Sincronizando</span>
+        </div>
+        <div class="sync-progress-track">
+            <progress id="progressBar" value="12" max="100" class="progress-sin-fondo"></progress>
+        </div>
+        <span id="progressText" class="sync-progress-text"></span>
+    </div>
+</div>
+@* <div id="fondoMicuenta">
+    <div id="logocamion"></div>
+</div> *@
+@* <div id="selectLenguaje" style="margin-top: 8vh">
+    <LanguageSelect />
+</div>
+ *@
+<div class="contentHome fullscreen">
+
+    @if (!isLogueado)
+    {
+        <IndexLoginView @bind-TxtVD="txtVD"
+                         @bind-TxtPwd="txtPwd"
+                         @bind-Open="Open"
+                         HideDenyOnIOS="@HideDenyOnIOS"
+                         VersionApp="@versionAplicacion"
+                         OnIngresarClick="IngresarClickAsync"
+                         OnCrearUsuarioClick="NavegarASolicitudAlta"
+                         OnAcceptGPS="SolicitarPermisosAsync"
+                         OnDenyGPS="RegistrarDenegadoAsync" />
+    }
+    else
+    {
+        <IndexDashboardView EsUnClienteX="@esUnClienteX"
+                             CuentaSinPedido="@cuentasinpedido"
+                             PrimerIngre="@primerIngre"
+                             ComisionVendedoresString="@ComisionVendedoresString"
+                             ColorCoeficienteComision="@ColorCoeficienteComision"
+                             CantPedSinTX="@CantPedSinTX"
+                             ShowMenuusr="@showMenuusr"
+                             VdLogueadoCodigo="@vdLogueadoCodigo"
+                             VersionAplicacion="@versionAplicacion"
+                             VersionDatos="@versionDatos"
+                             UltimaSyncString="@ultimasync.ToString()"
+                             MensajeError="@mensajeError"
+                             ListadePrecios="@listadePrecios"
+                             ListadePreciosNombre="@ListadePreciosNomre"
+                             TipoVD="@oParam.tipoVD"
+                             ListasParaUsar="@GetListasParaUsar()"
+                             Opacity01="@opacityEstrellita01"
+                             Opacity02="@opacityEstrellita02"
+                             Opacity03="@opacityEstrellita03"
+                             Opacity04="@opacityEstrellita04"
+                             Opacity05="@opacityEstrellita05"
+                             Opacity06="@opacityEstrellita06"                    
+                             OnEliminarCuentaClick="AbrirModalEliminarCuenta"
+                             OnClientesClick="Clientes"
+                             OnPedidosClick="Pedidos"
+                             OnSincronizarManualClick="SincronizarManual"
+                             OnAbrirHomeVDClick="AbrirHomeVD"
+                             OnIngresarClick="esClientesIrProductos"
+                             OnCambiarLista="CambiarLista"
+                             OnForzarSincronizacionClick="() => ForzarSincronizacion(true)"
+                             OnAbrirModalSoporteClick="AbrirModalSoporte"
+                             OnLogOffClick="() => LogOff(false)" />
+
+        <ModalSoporte @bind-Open="_modalSoporteOpen"
+                      TxtLog="@txtLog"
+                      LinkWhatsapp="@LinkWhatsapp"
+                      EsAutogestion="@esUnClienteX"
+                      MailSoporte="@_mailSoporte"
+                      VersionApp="@versionAplicacion" />
+    }
+
+</div>
+
+<ModalActualizacionObligatoria
+    Open="@_modalActualizacionOpen"
+    Mensaje="@(_versionInfo?.Mensaje ?? "Para continuar usando la aplicación, debés actualizarla.")"
+    LinkAndroid="@(_versionInfo?.LinkAndroid ?? "")"
+    LinkIos="@(_versionInfo?.LinkIos ?? "")" />
+
+@* Modal Texto *@
+<div class="modal fade" id="modalTexto" style="padding-top:39px;">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content ">
+            <div class="modal-header">
+                <input type="text" @bind="@textolibre" />
+                <button @onclick="(args) => GuardarTexto(textolibre)" data-dismiss="modal">Agregar</button>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span aria-hidden="true"><img src="/img/mycart_del.svg" class="btnClose" /></span>
+                </button>
+            </div>
+            <div id="maincontainer">
+                <div class="row" style=" background: cornflowerblue; border: solid;width: 100%;">
+                    <div class="col-10">
+                        <p>Seleccionado:</p><p> @TextoSeleccionado</p>
+                    </div>
+                    <div class="col-2">
+                        <img width="25px" src="/img/mycart_del.svg" @onclick="(args) => BorrarSeleccionTexto()" />
+                    </div>
+                </div>
+
+                @foreach (var msg in TextoVD)
+                {
+                    <div class="row">
+                        <div class="col-10">
+                            <p @onclick="(args) => SeleccionarTexto(msg.TextoLibreVD)">@msg.TextoLibreVD</p>
+                        </div>
+                        <div class="col-2" data-dismiss="modal">
+                            <img width="25px" src="/img/mycart_del.svg" @onclick="(args) => BorrarTexto(msg.TextoLibreVD)" />
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (_modalEliminarOpen)
+{
+    <div class="modal fade show d-block" tabindex="-1" aria-modal="true" role="dialog">
+        <div class="fade show"></div>
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow">
+                <div class="modal-header">
+                    <h5 class="modal-title">@AppResources.EliminarCuenta</h5>
+                    <button type="button" class="btn-close" aria-label="Cerrar" @onclick="CerrarModalEliminarCuenta" disabled="@_procesandoEliminar">
+                    </button>
+                </div>
+                <div class="p-4">
+                    <p class="mb-2">@AppResources.EliminarCuentaDescripcion</p>
+                    <p class="mb-3">@AppResources.QuereContinuar</p>
+                    @if (!string.IsNullOrWhiteSpace(_mensajeEliminarCuenta))
+                    {
+                        <div class="alert alert-info mb-0" style="white-space: pre-line;">@_mensajeEliminarCuenta</div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" @onclick="CerrarModalEliminarCuenta" disabled="@_procesandoEliminar">@AppResources.Cancelar</button>
+                    <button type="button" class="btn btn-danger" @onclick="ConfirmarEliminarCuenta" disabled="@_procesandoEliminar">
+                        @if (_procesandoEliminar)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            <span>@AppResources.Procesando</span>
+                        }
+                        else
+                        {
+                            <span>@AppResources.Aceptar</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
