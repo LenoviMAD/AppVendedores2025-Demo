@@ -35,7 +35,7 @@ El target Android puede depender de la versión de JDK instalada en la máquina 
 
 Esta app no tiene base de datos propia en el servidor — usa SQLite localmente solo para cachear lo sincronizado. Todo el login, catálogo, clientes y pedidos vienen de:
 
-- **`VendedoresApi-Demo`** → `http://localhost:5101` (ver [`../VendedoresApi-Demo`](../VendedoresApi-Demo), configurado en `Shared/Parametros.cs` vía `ApiURL_Primaria`). Hay que levantarla **antes** de abrir la app, o el login va a fallar.
+- **`VendedoresApi-Demo`** → `http://localhost:5101` (ver [`VendedoresApi-Demo`](https://github.com/LenoviMAD/VendedoresApi-Demo), configurado en `Shared/Parametros.cs` vía `ApiURL_Primaria`). Hay que levantarla **antes** de abrir la app, o el login va a fallar.
 
 ## Credenciales
 
